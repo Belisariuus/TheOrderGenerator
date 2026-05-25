@@ -1,0 +1,42 @@
+{
+  "processes": [
+    { "code": "П01", "name": "Управление кредитным риском", "ownerDepartment": "Управление рисков", "linkedKP": ["КП01", "КП03", "КП05"] },
+    { "code": "П02", "name": "Операционное управление", "ownerDepartment": "Операционный департамент", "linkedKP": ["КП02", "КП08"] },
+    { "code": "П03", "name": "Управление ликвидностью", "ownerDepartment": "Казначейство", "linkedKP": ["КП04"] },
+    { "code": "П04", "name": "Управление активами и пассивами", "ownerDepartment": "Финансовый департамент", "linkedKP": ["КП06", "КП09"] },
+    { "code": "П05", "name": "Управление комплаенс", "ownerDepartment": "Департамент комплаенс", "linkedKP": [] },
+    { "code": "П06", "name": "Внутренний контроль", "ownerDepartment": "Служба внутреннего контроля", "linkedKP": ["КП07"] },
+    { "code": "П07", "name": "Управление персоналом", "ownerDepartment": "HR-департамент", "linkedKP": ["КП10"] },
+    { "code": "П08", "name": "ИТ-управление", "ownerDepartment": "ИТ-департамент", "linkedKP": ["КП11", "КП12"] },
+    { "code": "П09", "name": "Управление рисками", "ownerDepartment": "Управление рисков", "linkedKP": ["КП01", "КП13"] },
+    { "code": "П10", "name": "Финансовый мониторинг", "ownerDepartment": "Финансовый департамент", "linkedKP": ["КП14"] },
+    { "code": "П11", "name": "Документооборот", "ownerDepartment": "Административный департамент", "linkedKP": ["КП03"] },
+    { "code": "П12", "name": "Бухгалтерский учет", "ownerDepartment": "Бухгалтерия", "linkedKP": ["КП15"] },
+    { "code": "П13", "name": "Кредитный конвейер", "ownerDepartment": "Кредитный департамент", "linkedKP": ["КП16", "КП17"] },
+    { "code": "П14", "name": "Платежные системы", "ownerDepartment": "Платежный департамент", "linkedKP": ["КП18"] },
+    { "code": "П15", "name": "Безопасность", "ownerDepartment": "Служба безопасности", "linkedKP": ["КП19"] },
+    { "code": "П16", "name": "Маркетинг", "ownerDepartment": "Маркетинговый департамент", "linkedKP": ["КП20"] }
+  ],
+  "clientPaths": [
+    { "code": "КП01", "name": "Оформление кредита", "ownerDepartment": "Кредитный департамент", "linkedProcesses": ["П01", "П09"] },
+    { "code": "КП02", "name": "Открытие счета", "ownerDepartment": "Операционный департамент", "linkedProcesses": ["П02"] },
+    { "code": "КП03", "name": "Документооборот", "ownerDepartment": "Административный департамент", "linkedProcesses": ["П01", "П11"] },
+    { "code": "КП04", "name": "Платежи и переводы", "ownerDepartment": "Платежный департамент", "linkedProcesses": ["П03"] },
+    { "code": "КП05", "name": "Кредитные каникулы", "ownerDepartment": "Кредитный департамент", "linkedProcesses": ["П01"] },
+    { "code": "КП06", "name": "Инвестиции", "ownerDepartment": "Инвестиционный департамент", "linkedProcesses": ["П04"] },
+    { "code": "КП07", "name": "Страхование", "ownerDepartment": "Страховой департамент", "linkedProcesses": ["П06"] },
+    { "code": "КП08", "name": "Зарплатный проект", "ownerDepartment": "Операционный департамент", "linkedProcesses": ["П02"] },
+    { "code": "КП09", "name": "Брокерское обслуживание", "ownerDepartment": "Брокерский департамент", "linkedProcesses": ["П04"] },
+    { "code": "КП10", "name": "Кадровый документооборот", "ownerDepartment": "HR-департамент", "linkedProcesses": ["П07"] },
+    { "code": "КП11", "name": "Цифровой банкинг", "ownerDepartment": "ИТ-департамент", "linkedProcesses": ["П08"] },
+    { "code": "КП12", "name": "Кибербезопасность", "ownerDepartment": "ИТ-департамент", "linkedProcesses": ["П08"] },
+    { "code": "КП13", "name": "Скоринг", "ownerDepartment": "Управление рисков", "linkedProcesses": ["П09"] },
+    { "code": "КП14", "name": "Валютный контроль", "ownerDepartment": "Финансовый департамент", "linkedProcesses": ["П10"] },
+    { "code": "КП15", "name": "Бухгалтерская отчетность", "ownerDepartment": "Бухгалтерия", "linkedProcesses": ["П12"] },
+    { "code": "КП16", "name": "Заявка на кредит", "ownerDepartment": "Кредитный департамент", "linkedProcesses": ["П13"] },
+    { "code": "КП17", "name": "Решение по кредиту", "ownerDepartment": "Кредитный департамент", "linkedProcesses": ["П13"] },
+    { "code": "КП18", "name": "Межбанковские платежи", "ownerDepartment": "Платежный департамент", "linkedProcesses": ["П14"] },
+    { "code": "КП19", "name": "Инциденты безопасности", "ownerDepartment": "Служба безопасности", "linkedProcesses": ["П15"] },
+    { "code": "КП20", "name": "Маркетинговые акции", "ownerDepartment": "Маркетинговый департамент", "linkedProcesses": ["П16"] }
+  ]
+}

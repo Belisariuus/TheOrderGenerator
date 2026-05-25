@@ -1,0 +1,404 @@
+.employee-row {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	margin-bottom: 15px;
+	position: relative;
+}
+
+.employee-search-input {
+	flex: 1;
+	padding: 10px 15px;
+	border: 2px solid #ddd;
+	border-radius: 6px;
+	font-size: 14px;
+	transition: border-color 0.3s;
+}
+
+.employee-search-input:focus {
+	border-color: #007bff;
+	outline: none;
+	box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
+}
+
+.suggestions-box {
+	position: absolute;
+	top: 100%;
+	left: 0;
+	right: 0;
+	background: white;
+	border: 1px solid #ddd;
+	border-radius: 6px;
+	box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+	z-index: 1000;
+	max-height: 300px;
+	overflow-y: auto;
+	display: none;
+}
+
+.suggestion-item {
+	padding: 12px 15px;
+	cursor: pointer;
+	border-bottom: 1px solid #f0f0f0;
+	transition: background-color 0.2s;
+}
+
+.suggestion-item:hover {
+	background-color: #f8f9fa;
+}
+
+.suggestion-item.disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+	background-color: #f8f9fa;
+}
+
+.emp-name {
+	font-weight: 600;
+	color: #333;
+	margin-bottom: 4px;
+}
+
+.emp-details {
+	font-size: 12px;
+	color: #666;
+	display: flex;
+	gap: 10px;
+	flex-wrap: wrap;
+}
+
+.emp-position {
+	color: #007bff;
+}
+
+.emp-department {
+	color: #28a745;
+}
+
+.emp-bank {
+	color: #6c757d;
+	background: #f8f9fa;
+	padding: 2px 6px;
+	border-radius: 3px;
+	font-size: 11px;
+}
+
+.already-selected {
+	font-size: 11px;
+	color: #dc3545;
+	margin-top: 4px;
+}
+
+.no-results {
+	color: #6c757d;
+	text-align: center;
+	padding: 20px;
+	cursor: default;
+}
+
+mark {
+	background-color: #fff3cd;
+	padding: 1px 3px;
+	border-radius: 2px;
+}
+
+.btn-small {
+	padding: 8px 12px;
+	font-size: 13px;
+}
+
+.btn-danger {
+	background-color: #dc3545;
+	border-color: #dc3545;
+}
+
+.btn-danger:hover {
+	background-color: #c82333;
+	border-color: #bd2130;
+}
+
+/* Стили для модуля 3 */
+.employee-section {
+    margin-bottom: 25px;
+    padding: 15px;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    background: #fafafa;
+}
+
+.employee-section h3 {
+    margin-bottom: 15px;
+    color: #333;
+    font-size: 16px;
+}
+
+.employee-row {
+    position: relative;
+    margin-bottom: 10px;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.employee-search-input {
+    flex: 1;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    font-size: 14px;
+}
+
+.suggestions-box {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    max-height: 200px;
+    overflow-y: auto;
+    z-index: 1000;
+    display: none;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
+.suggestion-item {
+    padding: 10px;
+    cursor: pointer;
+    border-bottom: 1px solid #eee;
+}
+
+.suggestion-item:hover {
+    background: #f0f0f0;
+}
+
+.suggestion-item strong {
+    color: #333;
+}
+
+.suggestion-item small {
+    color: #666;
+}
+
+.btn-secondary {
+    background: #6c757d;
+    color: white;
+    padding: 8px 15px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+}
+
+.btn-secondary:hover {
+    background: #5a6268;
+}
+
+.btn-danger {
+    background: #dc3545;
+    color: white;
+    padding: 8px 15px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+}
+
+.btn-danger:hover {
+    background: #c82333;
+}
+
+.btn-small {
+    padding: 5px 10px;
+    font-size: 12px;
+}
+
+.required {
+    color: red;
+}
+
+.info-message {
+    padding: 20px;
+    text-align: center;
+    background: #e7f3ff;
+    border-radius: 8px;
+    color: #0066cc;
+}
+
+/* Информационный баннер */
+.info-banner {
+    background: #e3f2fd;
+    padding: 10px 15px;
+    border-radius: 5px;
+    margin-bottom: 20px;
+    border-left: 3px solid #2196F3;
+    font-size: 14px;
+}
+
+/* Подсказки в поиске */
+.suggestion-item {
+    padding: 10px;
+    cursor: pointer;
+    border-bottom: 1px solid #eee;
+}
+
+.suggestion-item:hover {
+    background: #f0f0f0;
+}
+
+.suggestion-name {
+    margin-bottom: 5px;
+}
+
+.suggestion-details {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+}
+
+.suggestion-badge {
+    display: inline-block;
+    padding: 2px 6px;
+    background: #f0f0f0;
+    border-radius: 3px;
+    font-size: 11px;
+    color: #666;
+}
+
+.bank-badge {
+    background: #4CAF50;
+    color: white;
+}
+
+/* Теги выбранных сотрудников */
+.selected-tag, .selected-tags-container {
+    margin-top: 10px;
+}
+
+.employee-tag {
+    display: inline-flex;
+    align-items: center;
+    justify-content: space-between;
+    background: #e8f5e9;
+    border: 1px solid #4CAF50;
+    border-radius: 5px;
+    padding: 8px 12px;
+    margin: 5px;
+    min-width: 250px;
+}
+
+.tag-content {
+    flex: 1;
+}
+
+.tag-name {
+    display: block;
+    margin-bottom: 3px;
+}
+
+.tag-details {
+    font-size: 11px;
+    color: #666;
+}
+
+.tag-bank {
+    display: inline-block;
+    font-size: 10px;
+    background: #4CAF50;
+    color: white;
+    padding: 2px 6px;
+    border-radius: 3px;
+    margin-top: 3px;
+}
+
+.tag-remove {
+    background: #dc3545;
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 24px;
+    height: 24px;
+    cursor: pointer;
+    font-size: 16px;
+    margin-left: 10px;
+}
+
+.tag-remove:hover {
+    background: #c82333;
+}
+
+/* Модальное окно выбора сотрудника */
+.employee-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+}
+
+.modal-content {
+    background: white;
+    border-radius: 8px;
+    width: 500px;
+    max-width: 90%;
+    max-height: 80%;
+    overflow: hidden;
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px;
+    border-bottom: 1px solid #ddd;
+}
+
+.modal-close {
+    background: none;
+    border: none;
+    font-size: 24px;
+    cursor: pointer;
+}
+
+.modal-body {
+    padding: 15px;
+}
+
+.modal-search {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    margin-bottom: 15px;
+}
+
+.modal-list {
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.modal-item {
+    padding: 10px;
+    cursor: pointer;
+    border-bottom: 1px solid #eee;
+}
+
+.modal-item:hover {
+    background: #f0f0f0;
+}
+
+.modal-item-name {
+    margin-bottom: 5px;
+}
+
+.modal-item-details {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    font-size: 12px;
+    color: #666;
+}

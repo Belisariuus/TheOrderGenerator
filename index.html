@@ -1,0 +1,149 @@
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Генератор распоряжений</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="css/emp.css">
+    <link rel="stylesheet" href="css/config.css">
+    <link rel="stylesheet" href="css/processesModule.css">
+    <link rel="stylesheet" href="css/systems.css">
+    <style>
+
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>Генератор распоряжений для аудиторских проверок УВА</h1>
+    <div id="modules-container" class="modules-grid"></div>
+</div>
+
+<div class="global-actions">
+    <button id="showConfigBtn">Показать конфигурацию</button>
+    <button id="downloadConfigBtn">Скачать конфиг</button>
+    <button id="uploadConfigBtn">Загрузить конфиг</button>
+    <input type="file" id="configFileInput" accept=".json" style="display: none;">
+    <button id="docxGenerate">Сформировать документ</button>
+</div>
+
+<div id="configPreview" class="config-preview">
+    <h4>Текущая конфигурация:</h4>
+    <pre id="configContent"></pre>
+</div>
+<script src="libs/docxtemplater.js"></script>
+<script src="libs/pizzip.js"></script>
+<script src="libs/pizzip-utils.js"></script>
+<script src="libs/FileSaver.min.js"></script>
+<script src="js/global-config.js"></script>
+<script
+        type="text/javascript"
+        src="libs/pizzip-utils-ie.js"
+></script>
+<script type="module">
+    // Импортируем модули
+    import Module1 from './js/1_Module_SettingsOrder.js';
+    import Module2 from './js/2_Module_Questionnaire.js';
+    import Module3 from './js/3_Module_TeamAudit.js';
+    import Module4 from './js/4_Module_ProcessesModule.js';
+    import Module5 from './js/5_Module_AutomatedSystems.js';
+    import DocxGenerator from './js/6_Module_DocxGenerator.js';
+    const configManager = window.appConfigManager;
+
+
+    // Массив модулей для загрузки
+    const modules = [
+        { name: 'Module1', class: Module1, title: 'Модуль 1' },
+        { name: 'Module2', class: Module2, title: 'Модуль 2' },
+        { name: 'Module3', class: Module3, title: 'Модуль 3' },
+        { name: 'Module4', class: Module4, title: 'Модуль 4' },
+        { name: 'Module5', class: Module5, title: 'Модуль 5' },
+        { name: 'DocxGenerator', class: DocxGenerator, title: 'DocxGenerator' }
+    ];
+
+    // Рендерим все модули
+    const container = document.getElementById('modules-container');
+
+    // Создаем и сохраняем экземпляры модулей
+    const moduleInstances = [];
+    
+    modules.forEach(moduleInfo => {
+        if (moduleInfo.name !== 'DocxGenerator') {
+            const moduleInstance = new moduleInfo.class(configManager);
+            moduleInstances.push(moduleInstance);
+            const moduleElement = moduleInstance.render();
+            container.appendChild(moduleElement);
+        }
+    });
+
+    // Сохраняем экземпляр генератора для доступа из кнопки
+    window.docxGeneratorInstance = null;
+    window.moduleInstances = moduleInstances;
+
+    // Подписываемся на изменения конфигурации
+    configManager.subscribe((moduleName, data, fullConfig) => {
+        console.log(`Конфигурация обновлена от ${moduleName}:`, data);
+
+        // Проверяем, все ли модули сохранены
+        if (configManager.isAllModulesSaved()) {
+            console.log('✅ Все модули сохранили свои данные!');
+        }
+
+        // Автоматически сохраняем в sessionStorage при любом изменении
+        configManager.saveToSessionStorage();
+    });
+
+    // Кнопка показа конфигурации
+    document.getElementById('showConfigBtn').addEventListener('click', () => {
+        const preview = document.getElementById('configPreview');
+        const content = document.getElementById('configContent');
+        content.textContent = configManager.getFullConfigJSON();
+        preview.classList.toggle('show');
+    });
+
+    // Кнопка скачивания конфигурации
+    document.getElementById('downloadConfigBtn').addEventListener('click', () => {
+        configManager.exportConfigToFile();
+    });
+
+    // Кнопка загрузки конфигурации
+    document.getElementById('uploadConfigBtn').addEventListener('click', () => {
+        document.getElementById('configFileInput').click();
+    });
+
+    // Обработка загруженного файла конфигурации
+    document.getElementById('configFileInput').addEventListener('change', async (event) => {
+        const file = event.target.files[0];
+        if (file) {
+            try {
+                await configManager.importConfigFromFile(file);
+                alert('Конфигурация успешно загружена! Страница будет перезагружена для применения изменений.');
+                location.reload();
+            } catch (e) {
+                alert('Ошибка при загрузке конфигурации: ' + e.message);
+            }
+            // Очищаем input для возможности повторной загрузки того же файла
+            event.target.value = '';
+        }
+    });
+
+    // Генерация документа
+    document.getElementById('docxGenerate').addEventListener('click', async () => {
+        if (!window.docxGeneratorInstance) {
+            window.docxGeneratorInstance = new DocxGenerator(configManager);
+        }
+        await window.docxGeneratorInstance.prepareDocument();
+    });
+
+    // Автоматическая загрузка конфигурации из sessionStorage при старте
+    window.addEventListener('DOMContentLoaded', () => {
+        if (configManager.loadFromSessionStorage()) {
+            console.log('Конфигурация восстановлена из sessionStorage');
+            // Метод loadFromSessionStorage уже уведомляет подписчиков через notifyListeners
+            // Дополнительных действий не требуется, модули сами обработают событие SessionRestore
+        }
+    });
+
+    // Выводим начальную конфигурацию в консоль
+    console.log('Начальная конфигурация:', configManager.getConfig());
+</script>
+</body>
+</html>
