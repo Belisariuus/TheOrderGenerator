@@ -324,10 +324,9 @@ export default class DocxGenerator {
     }
 
     /**
-     * Загружает справочные данные из JSON файлов
+     * Загружаем справочные данные из JSON файлов
      */
     async loadReferenceData() {
-        // Загружаем процессы и клиентские пути
         if (!this.processesData) {
             try {
                 const response = await fetch('./data/processes.json');
@@ -336,21 +335,9 @@ export default class DocxGenerator {
                 console.log('Загружены процессы и КП для генерации:', this.processesData);
             } catch (error) {
                 console.error('Ошибка загрузки processes.json:', error);
-                // Fallback данные
-                this.processesData = {
-                    processes: [
-                        { code: "П01", name: "Процесс 1", ownerDepartment: "Отдел 1", linkedKP: ["КП01"] },
-                        { code: "П02", name: "Процесс 2", ownerDepartment: "Отдел 2", linkedKP: ["КП02"] }
-                    ],
-                    clientPaths: [
-                        { code: "КП01", name: "Клиентский путь 1", ownerDepartment: "Отдел 1", linkedProcesses: ["П01"] },
-                        { code: "КП02", name: "Клиентский путь 2", ownerDepartment: "Отдел 2", linkedProcesses: ["П02"] }
-                    ]
-                };
             }
         }
 
-        // Загружаем системы
         if (!this.systemsData) {
             try {
                 const response = await fetch('./data/systems.json');
@@ -359,17 +346,9 @@ export default class DocxGenerator {
                 console.log('Загружены системы для генерации:', this.systemsData);
             } catch (error) {
                 console.error('Ошибка загрузки systems.json:', error);
-                // Fallback данные
-                this.systemsData = {
-                    systems: [
-                        { id: "AS1", name: "Система А", roles: ["Роль1", "Роль2"] },
-                        { id: "AS2", name: "Система Б", roles: ["Роль3", "Роль4"] }
-                    ]
-                };
             }
         }
 
-        // Загружаем сотрудников
         if (!this.employeesData) {
             try {
                 const response = await fetch('./data/employees.json');
@@ -378,7 +357,6 @@ export default class DocxGenerator {
                 console.log('Загружены сотрудники для генерации:', this.employeesData.length);
             } catch (error) {
                 console.error('Ошибка загрузки employees.json:', error);
-                this.employeesData = [];
             }
         }
     }
@@ -662,6 +640,7 @@ export default class DocxGenerator {
 
             // Количество процессов для первой страницы
             const countProcess = uniqueProcess.size;
+            console.log(`Количество процессов: ${uniqueProcess.size}`);
             let strCountProcess;
             const lastDigit = String(countProcess).slice(-1);
             if (lastDigit === '1' && countProcess !== 11) {
@@ -784,8 +763,10 @@ export default class DocxGenerator {
             const curatorParts = [];
             for (let i = 0; i < this.listDataCuratorsAudit.length; i++) {
                 const curator = this.listDataCuratorsAudit[i];
-                const curatorFIO = this.shortFio(this.removeBrackets(curator[0]), false, true);
-                const curatorPost = this.getFullTitle(curator[1].toLowerCase(), curator[2], true, true, true);
+                const curatorFIO = this.shortFio(this.removeBrackets(curator[0]), false, false);
+                console.log(`Куратор ${curator}`);
+                const curatorPost = this.capitalizeFirstLetter(
+                    this.getFullTitle(curator[2].toLowerCase(), curator[1], true, true, false));
                 curatorParts.push(`${curatorFIO} – ${curatorPost}`);
             }
             stringCurators = curatorParts.join(', ');
@@ -795,15 +776,27 @@ export default class DocxGenerator {
         }
 
         // Руководитель
-        const headAuditFIO = this.shortFio(this.removeBrackets(this.dataHeadAudit[2]), false, true);
-        const headAuditPost = this.getFullTitle(this.dataHeadAudit[0].toLowerCase(), this.dataHeadAudit[this.dataHeadAudit.length - 1], false, true, true);
-
+        const headAuditFIO = this.shortFio(this.removeBrackets(this.dataHeadAudit[2]), false, false);
+        const headAuditPost = this.capitalizeFirstLetter(
+            this.getFullTitle(
+                this.dataHeadAudit[0].toLowerCase(),
+                this.dataHeadAudit[this.dataHeadAudit.length - 1],
+                true,
+                true,
+                false
+            ));
         // Зам руководителя
         let deputyHeadFIO = '';
         let deputyHeadPost = '';
         if (this.dataDeputyHeadAudit) {
             deputyHeadFIO = this.shortFio(this.removeBrackets(this.dataDeputyHeadAudit[2]), false, true);
-            deputyHeadPost = this.getFullTitle(this.dataDeputyHeadAudit[0].toLowerCase(), this.dataDeputyHeadAudit[this.dataDeputyHeadAudit.length - 1], true, true, true);
+            deputyHeadPost = this.getFullTitle(
+                this.dataDeputyHeadAudit[0].toLowerCase(),
+                this.dataDeputyHeadAudit[this.dataDeputyHeadAudit.length - 1],
+                true,
+                true,
+                false
+            );
         }
 
         // Подписант
@@ -869,7 +862,7 @@ export default class DocxGenerator {
             dictOrder.showLinkApp1 = false;
         }
 
-        if (this.listProcessesAudit && listDictProcesses && listDictProcesses.length > 0) {
+        if (this.listProcessesAudit) {
             dictOrder.kps_and_ps_count = countProcessClientPath;
             dictOrder.processes = listDictProcesses;
             dictOrder.showApp2 = true;
@@ -1576,6 +1569,12 @@ export default class DocxGenerator {
         if (!patron) return true;
         return patron.endsWith('на');
     }
+
+
+	capitalizeFirstLetter(str) {
+	    if (!str) return str;
+	    return str.charAt(0).toUpperCase() + str.slice(1);
+	}
 
     /**
      * Расшифровка сокращений в должностях
