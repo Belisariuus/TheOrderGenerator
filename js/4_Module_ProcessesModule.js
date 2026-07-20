@@ -110,6 +110,107 @@ export default class Module4 {
         });
     }
 
+    // ===== СИНХРОНИЗАЦИЯ ВЫДЕЛЕНИЯ =====
+
+    // Для включения (основной режим и change-include)
+    syncIncludePathsFromProcesses() {
+        const selectedProcessCodes = Array.from(this.selectedProcessesForInclude);
+        const linkedPathCodes = new Set();
+        selectedProcessCodes.forEach(procCode => {
+            const process = this.processes.find(p => p.code === procCode);
+            if (process && process.linkedKP) {
+                process.linkedKP.forEach(kpCode => linkedPathCodes.add(kpCode));
+            }
+        });
+        this.selectedPathsForInclude = linkedPathCodes;
+        this.updateIncludePathsHighlight();
+    }
+
+    syncIncludeProcessesFromPaths() {
+        const selectedPathCodes = Array.from(this.selectedPathsForInclude);
+        const linkedProcessCodes = new Set();
+        selectedPathCodes.forEach(pathCode => {
+            const path = this.clientPaths.find(p => p.code === pathCode);
+            if (path && path.linkedProcesses) {
+                path.linkedProcesses.forEach(procCode => linkedProcessCodes.add(procCode));
+            }
+        });
+        this.selectedProcessesForInclude = linkedProcessCodes;
+        this.updateIncludeProcessesHighlight();
+    }
+
+    // Для исключения (change-exclude)
+    syncExcludePathsFromProcesses() {
+        const selectedProcessCodes = Array.from(this.selectedProcessesForExclude);
+        const linkedPathCodes = new Set();
+        selectedProcessCodes.forEach(procCode => {
+            const process = this.processes.find(p => p.code === procCode);
+            if (process && process.linkedKP) {
+                process.linkedKP.forEach(kpCode => linkedPathCodes.add(kpCode));
+            }
+        });
+        this.selectedPathsForExclude = linkedPathCodes;
+        this.updateExcludePathsHighlight();
+    }
+
+    syncExcludeProcessesFromPaths() {
+        const selectedPathCodes = Array.from(this.selectedPathsForExclude);
+        const linkedProcessCodes = new Set();
+        selectedPathCodes.forEach(pathCode => {
+            const path = this.clientPaths.find(p => p.code === pathCode);
+            if (path && path.linkedProcesses) {
+                path.linkedProcesses.forEach(procCode => linkedProcessCodes.add(procCode));
+            }
+        });
+        this.selectedProcessesForExclude = linkedProcessCodes;
+        this.updateExcludeProcessesHighlight();
+    }
+
+    // ===== ФИЛЬТРАЦИЯ СПИСКОВ ПО СВЯЗЯМ =====
+
+    // Для включения (новый заказ и change-include)
+    getFilteredPathsForInclude() {
+        const selectedProcessCodes = Array.from(this.selectedProcessesForInclude);
+        if (selectedProcessCodes.length === 0) {
+            return this.clientPaths; // если ничего не выбрано, показываем все
+        }
+        // Оставляем только те КП, у которых linkedProcesses пересекается с выбранными процессами
+        return this.clientPaths.filter(path =>
+            path.linkedProcesses.some(procCode => selectedProcessCodes.includes(procCode))
+        );
+    }
+
+    getFilteredProcessesForInclude() {
+        const selectedPathCodes = Array.from(this.selectedPathsForInclude);
+        if (selectedPathCodes.length === 0) {
+            return this.processes;
+        }
+        return this.processes.filter(process =>
+            process.linkedKP.some(kpCode => selectedPathCodes.includes(kpCode))
+        );
+    }
+
+    // Для исключения (change-exclude)
+    getFilteredPathsForExclude() {
+        const selectedProcessCodes = Array.from(this.selectedProcessesForExclude);
+        if (selectedProcessCodes.length === 0) {
+            return this.clientPaths;
+        }
+        return this.clientPaths.filter(path =>
+            path.linkedProcesses.some(procCode => selectedProcessCodes.includes(procCode))
+        );
+    }
+
+    getFilteredProcessesForExclude() {
+        const selectedPathCodes = Array.from(this.selectedPathsForExclude);
+        if (selectedPathCodes.length === 0) {
+            return this.processes;
+        }
+        return this.processes.filter(process =>
+            process.linkedKP.some(kpCode => selectedPathCodes.includes(kpCode))
+        );
+    }
+
     getMockProcesses() {
         return [
             { code: "П01", name: "Процесс 1", ownerDepartment: "Отдел 1", linkedKP: ["КП01", "КП03"] },
@@ -369,19 +470,19 @@ export default class Module4 {
     }
 
     renderProcessesList() {
-        let filtered = [...this.processes];
-        if (this.includeProcessSearchTerm) {
-            const term = this.includeProcessSearchTerm.toLowerCase();
-            filtered = filtered.filter(p =>
-                p.code.toLowerCase().includes(term) ||
-                p.name.toLowerCase().includes(term) ||
-                p.ownerDepartment.toLowerCase().includes(term)
-            );
-        }
+	    let filtered = this.getFilteredProcessesForInclude();
+	    if (this.includeProcessSearchTerm) {
+	        const term = this.includeProcessSearchTerm.toLowerCase();
+	        filtered = filtered.filter(p =>
+	            p.code.toLowerCase().includes(term) ||
+	            p.name.toLowerCase().includes(term) ||
+	            p.ownerDepartment.toLowerCase().includes(term)
+	        );
+	    }
 
-        const start = (this.currentIncludeProcessPage - 1) * this.itemsPerPage;
-        const end = start + this.itemsPerPage;
-        const paginated = filtered.slice(start, end);
+	    const start = (this.currentIncludeProcessPage - 1) * this.itemsPerPage;
+	    const end = start + this.itemsPerPage;
+	    const paginated = filtered.slice(start, end);
 
         if (paginated.length === 0) return '<div class="empty-message">Нет данных</div>';
 
@@ -423,15 +524,15 @@ export default class Module4 {
     }
 
     renderProcessesListForInclude() {
-        let filtered = [...this.processes];
-        if (this.includeProcessSearchTerm) {
-            const term = this.includeProcessSearchTerm.toLowerCase();
-            filtered = filtered.filter(p =>
-                p.code.toLowerCase().includes(term) ||
-                p.name.toLowerCase().includes(term) ||
-                p.ownerDepartment.toLowerCase().includes(term)
-            );
-        }
+	    let filtered = this.getFilteredProcessesForInclude();
+	    if (this.includePathSearchTerm) {
+	        const term = this.includePathSearchTerm.toLowerCase();
+	        filtered = filtered.filter(p =>
+	            p.code.toLowerCase().includes(term) ||
+	            p.name.toLowerCase().includes(term) ||
+	            p.ownerDepartment.toLowerCase().includes(term)
+	        );
+	    }
 
         const start = (this.currentIncludeProcessPage - 1) * this.itemsPerPage;
         const end = start + this.itemsPerPage;
@@ -450,7 +551,7 @@ export default class Module4 {
     }
 
     renderPathsListForInclude() {
-        let filtered = [...this.clientPaths];
+        let filtered = this.getFilteredPathsForInclude();
         if (this.includePathSearchTerm) {
             const term = this.includePathSearchTerm.toLowerCase();
             filtered = filtered.filter(p =>
@@ -477,7 +578,7 @@ export default class Module4 {
     }
 
     renderProcessesListForExclude() {
-        let filtered = [...this.processes];
+        let filtered = this.getFilteredProcessesForExclude();
         if (this.excludeProcessSearchTerm) {
             const term = this.excludeProcessSearchTerm.toLowerCase();
             filtered = filtered.filter(p =>
@@ -504,7 +605,7 @@ export default class Module4 {
     }
 
     renderPathsListForExclude() {
-        let filtered = [...this.clientPaths];
+        let filtered = this.getFilteredPathsForExclude();
         if (this.excludePathSearchTerm) {
             const term = this.excludePathSearchTerm.toLowerCase();
             filtered = filtered.filter(p =>
@@ -740,7 +841,7 @@ export default class Module4 {
         });
     }
 
-    processClickHandler(e) {
+	processClickHandler(e) {
         const item = e.currentTarget;
         const code = item.dataset.code;
         const isCtrlPressed = e.ctrlKey;
@@ -755,10 +856,13 @@ export default class Module4 {
                 this.selectedProcessesForInclude.add(code);
             }
         }
-        this.updateProcessesHighlight();
+        // Обновляем списки – теперь КП будут отфильтрованы по выбранным процессам
+        this.updateProcessesList();   // обновить процессы (подсветка)
+        this.updatePathsList();       // обновить КП (фильтрация)
+        this.renderPagination();      // пересчитать пагинацию (изменилось кол-во элементов)
     }
 
-    pathClickHandler(e) {
+	pathClickHandler(e) {
         const item = e.currentTarget;
         const code = item.dataset.code;
         const isCtrlPressed = e.ctrlKey;
@@ -773,80 +877,87 @@ export default class Module4 {
                 this.selectedPathsForInclude.add(code);
             }
         }
-        this.updatePathsHighlight();
+        // Обновляем списки – теперь процессы будут отфильтрованы по выбранным КП
+        this.updatePathsList();       // обновить КП (подсветка)
+        this.updateProcessesList();   // обновить процессы (фильтрация)
+        this.renderPagination();
     }
 
-    includeProcessClickHandler(e) {
-        const item = e.currentTarget;
-        const code = item.dataset.code;
-        const isCtrlPressed = e.ctrlKey;
+	includeProcessClickHandler(e) {
+	    const item = e.currentTarget;
+	    const code = item.dataset.code;
+	    const isCtrlPressed = e.ctrlKey;
 
-        if (!isCtrlPressed) {
-            this.selectedProcessesForInclude.clear();
-            this.selectedProcessesForInclude.add(code);
-        } else {
-            if (this.selectedProcessesForInclude.has(code)) {
-                this.selectedProcessesForInclude.delete(code);
-            } else {
-                this.selectedProcessesForInclude.add(code);
-            }
-        }
-        this.updateIncludeProcessesHighlight();
-    }
+	    if (!isCtrlPressed) {
+	        this.selectedProcessesForInclude.clear();
+	        this.selectedProcessesForInclude.add(code);
+	    } else {
+	        if (this.selectedProcessesForInclude.has(code)) {
+	            this.selectedProcessesForInclude.delete(code);
+	        } else {
+	            this.selectedProcessesForInclude.add(code);
+	        }
+	    }
+	    this.syncIncludePathsFromProcesses(); // <-- добавлено
+	    this.updateIncludeProcessesHighlight();
+	}
 
-    includePathClickHandler(e) {
-        const item = e.currentTarget;
-        const code = item.dataset.code;
-        const isCtrlPressed = e.ctrlKey;
+	includePathClickHandler(e) {
+	    const item = e.currentTarget;
+	    const code = item.dataset.code;
+	    const isCtrlPressed = e.ctrlKey;
 
-        if (!isCtrlPressed) {
-            this.selectedPathsForInclude.clear();
-            this.selectedPathsForInclude.add(code);
-        } else {
-            if (this.selectedPathsForInclude.has(code)) {
-                this.selectedPathsForInclude.delete(code);
-            } else {
-                this.selectedPathsForInclude.add(code);
-            }
-        }
-        this.updateIncludePathsHighlight();
-    }
+	    if (!isCtrlPressed) {
+	        this.selectedPathsForInclude.clear();
+	        this.selectedPathsForInclude.add(code);
+	    } else {
+	        if (this.selectedPathsForInclude.has(code)) {
+	            this.selectedPathsForInclude.delete(code);
+	        } else {
+	            this.selectedPathsForInclude.add(code);
+	        }
+	    }
+	    this.syncIncludeProcessesFromPaths(); // <-- добавлено
+	    this.updateIncludePathsHighlight();
+	}
 
-    excludeProcessClickHandler(e) {
-        const item = e.currentTarget;
-        const code = item.dataset.code;
-        const isCtrlPressed = e.ctrlKey;
+	excludeProcessClickHandler(e) {
+	    const item = e.currentTarget;
+	    const code = item.dataset.code;
+	    const isCtrlPressed = e.ctrlKey;
 
-        if (!isCtrlPressed) {
-            this.selectedProcessesForExclude.clear();
-            this.selectedProcessesForExclude.add(code);
-        } else {
-            if (this.selectedProcessesForExclude.has(code)) {
-                this.selectedProcessesForExclude.delete(code);
-            } else {
-                this.selectedProcessesForExclude.add(code);
-            }
-        }
-        this.updateExcludeProcessesHighlight();
-    }
+	    if (!isCtrlPressed) {
+	        this.selectedProcessesForExclude.clear();
+	        this.selectedProcessesForExclude.add(code);
+	    } else {
+	        if (this.selectedProcessesForExclude.has(code)) {
+	            this.selectedProcessesForExclude.delete(code);
+	        } else {
+	            this.selectedProcessesForExclude.add(code);
+	        }
+	    }
+	    this.syncExcludePathsFromProcesses(); // <-- добавлено
+	    this.updateExcludeProcessesHighlight();
+	}
 
-    excludePathClickHandler(e) {
-        const item = e.currentTarget;
-        const code = item.dataset.code;
-        const isCtrlPressed = e.ctrlKey;
+	excludePathClickHandler(e) {
+	    const item = e.currentTarget;
+	    const code = item.dataset.code;
+	    const isCtrlPressed = e.ctrlKey;
 
-        if (!isCtrlPressed) {
-            this.selectedPathsForExclude.clear();
-            this.selectedPathsForExclude.add(code);
-        } else {
-            if (this.selectedPathsForExclude.has(code)) {
-                this.selectedPathsForExclude.delete(code);
-            } else {
-                this.selectedPathsForExclude.add(code);
-            }
-        }
-        this.updateExcludePathsHighlight();
-    }
+	    if (!isCtrlPressed) {
+	        this.selectedPathsForExclude.clear();
+	        this.selectedPathsForExclude.add(code);
+	    } else {
+	        if (this.selectedPathsForExclude.has(code)) {
+	            this.selectedPathsForExclude.delete(code);
+	        } else {
+	            this.selectedPathsForExclude.add(code);
+	        }
+	    }
+	    this.syncExcludeProcessesFromPaths(); // <-- добавлено
+	    this.updateExcludePathsHighlight();
+	}
 
     updateProcessesHighlight() {
         const processItems = this.container.querySelectorAll('#processesList .item');
@@ -1199,11 +1310,11 @@ export default class Module4 {
     }
 
     clearIncludeSelection() {
-        this.selectedProcessesForInclude.clear();
-        this.selectedPathsForInclude.clear();
-        this.updateIncludeProcessesHighlight();
-        this.updateIncludePathsHighlight();
-        this.showNotification('Выделение для включения очищено', 'info');
+	     this.selectedProcessesForInclude.clear();
+	     this.selectedPathsForInclude.clear();
+	     this.updateIncludeProcessesList();
+	     this.updateIncludePathsList();
+	     this.showNotification('Выделение для включения очищено', 'info');
     }
 
     clearExcludeSelection() {
@@ -1269,8 +1380,8 @@ export default class Module4 {
     }
 
     renderPagination() {
-        let filteredProcesses = [...this.processes];
-        if (this.includeProcessSearchTerm) {
+	    let filteredProcesses = this.getFilteredProcessesForInclude();
+	    if (this.includeProcessSearchTerm) {
             const term = this.includeProcessSearchTerm.toLowerCase();
             filteredProcesses = filteredProcesses.filter(p =>
                 p.code.toLowerCase().includes(term) ||
@@ -1287,8 +1398,8 @@ export default class Module4 {
             processPagination.innerHTML = '';
         }
 
-        let filteredPaths = [...this.clientPaths];
-        if (this.includePathSearchTerm) {
+	    let filteredPaths = this.getFilteredPathsForInclude();
+	    if (this.includePathSearchTerm) {
             const term = this.includePathSearchTerm.toLowerCase();
             filteredPaths = filteredPaths.filter(p =>
                 p.code.toLowerCase().includes(term) ||

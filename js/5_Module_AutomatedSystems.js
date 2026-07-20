@@ -75,12 +75,6 @@ export default class Module5 {
             console.log('Загружены АС:', this.systems);
         } catch (error) {
             console.error('Ошибка загрузки JSON, используем тестовые данные:', error);
-            this.systems = [
-                { id: "AS1", name: "Система А", roles: ["Роль1", "Роль2"] },
-                { id: "AS2", name: "Система Б", roles: ["Роль3", "Роль4", "Роль5"] },
-                { id: "AS3", name: "Система В", roles: ["Администратор", "Пользователь", "Аналитик"] },
-                { id: "AS4", name: "Система Г", roles: ["Руководитель", "Исполнитель"] }
-            ];
             this.filteredSystems = [...this.systems];
         }
 
@@ -103,25 +97,8 @@ export default class Module5 {
         // Очищаем массив сотрудников
         this.employees = [];
 
-        // Собираем всех сотрудников из разных полей teamData (уже полные объекты)
-        if (teamData.curators && Array.isArray(teamData.curators)) {
-            this.employees.push(...teamData.curators);
-        }
-
         if (teamData.leader) {
             this.employees.push(teamData.leader);
-        }
-
-        if (teamData.deputy) {
-            this.employees.push(teamData.deputy);
-        }
-
-        if (teamData.control) {
-            this.employees.push(teamData.control);
-        }
-
-        if (teamData.signer) {
-            this.employees.push(teamData.signer);
         }
 
         if (teamData.teamMembers && Array.isArray(teamData.teamMembers)) {
@@ -247,11 +224,17 @@ export default class Module5 {
                 </div>
 
                 <div id="rolesContainer" class="roles-container" style="display: none;">
+                    <div class="selection-info">
+                        <p>💡 <strong>Подсказка:</strong> Если не отметить роли, будет выбран параметр <Все необходимые роли></p>
+                    </div>
                     <label>Выберите роли:</label>
                     <div id="rolesList" class="checkbox-group"></div>
                 </div>
 
                 <div id="employeesContainer" class="employees-container" style="display: none;">
+                    <div class="selection-info">
+                        <p>💡 <strong>Подсказка:</strong> Если не отметить сотрудников, будет выбран параметр <Все сотрудники из Приложения 1></p>
+                    </div>
                     <label>Выберите сотрудников (из команды проверки):</label>
                     <div id="employeesList" class="checkbox-group"></div>
                 </div>
@@ -314,7 +297,7 @@ export default class Module5 {
 
     renderAddedItems() {
         if (this.addedItems.length === 0) {
-            return '<tr><td colspan="5" style="text-align: center;">Нет добавленных系统</noscript></td></tr>';
+            return '<tr><td colspan="5" style="text-align: center;">Нет добавленных</noscript></td></tr>';
         }
 
         return this.addedItems.map((item, index) => `

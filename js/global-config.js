@@ -1,13 +1,7 @@
-// Глобальный менеджер конфигурации
 class ConfigManager {
     constructor() {
         this.config = {
-            SettingsOrder: {
-                auditType: '',
-                orderType: '',
-                levelOrder: '',
-                selectedTB: ''
-            },
+            SettingsOrder: { },
             Questionnaire: { },
             TeamAudit: { },
             ProcessesModule: { },
@@ -16,7 +10,7 @@ class ConfigManager {
         };
 
         this.listeners = [];
-        this.saveStatus = new Map(); // для отслеживания сохранения каждого модуля
+        this.saveStatus = new Map();
     }
 
     // Получить всю конфигурацию
@@ -108,30 +102,24 @@ class ConfigManager {
         if (saved) {
             try {
                 const loadedConfig = JSON.parse(saved);
-                // Полная замена конфигурации с глубоким слиянием
                 Object.keys(this.config).forEach(key => {
                     if (loadedConfig[key]) {
                         this.config[key] = { ...loadedConfig[key] };
                     }
                 });
-                // Восстанавливаем статус сохранения для всех модулей
                 Object.keys(loadedConfig).forEach(moduleName => {
                     if (moduleName !== 'Generator') {
                         this.saveStatus.set(moduleName, true);
                     }
                 });
-                // Уведомляем подписчиков о восстановлении (для обновления UI)
-                // Сначала уведомляем SettingsOrder чтобы другие модули могли отрендериться
                 setTimeout(() => {
                     if (this.config.SettingsOrder && Object.keys(this.config.SettingsOrder).length > 0) {
                         this.notifyListeners('SettingsOrder', this.config.SettingsOrder, this.config);
                     }
-                    // Затем уведомляем о полном восстановлении
                     setTimeout(() => {
                         this.notifyListeners('SessionRestore', null, this.config);
                     }, 50);
                 }, 50);
-                console.log('✓ Конфигурация загружена из sessionStorage:', this.config);
                 return true;
             } catch (e) {
                 console.error('Ошибка загрузки из sessionStorage:', e);
@@ -221,11 +209,3 @@ class ConfigManager {
 
 // Создаем глобальный экземпляр
 window.appConfigManager = new ConfigManager();
-
-// Проверка корректности создания экземпляра (для отладки)
-if (typeof window.appConfigManager.saveToSessionStorage !== 'function') {
-    console.error('❗ КРИТИЧЕСКАЯ ОШИБКА: метод saveToSessionStorage не найден в appConfigManager');
-    console.error('Доступные методы:', Object.getOwnPropertyNames(Object.getPrototypeOf(window.appConfigManager)));
-} else {
-    console.log('✓ ConfigManager инициализирован корректно');
-}
