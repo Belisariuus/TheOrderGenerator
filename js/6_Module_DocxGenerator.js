@@ -2,8 +2,7 @@ export default class DocxGenerator {
     constructor(configManager) {
         this.configManager = configManager;
         this.config = configManager.getConfig();
-        
-        // Словари названий территориальных банков
+
         this.dictNameTB = {
             "ТБ ББ": ["Байкальский банк", "Байкальскому банку"],
             "ТБ ВВБ": ["Волго-Вятский банк", "Волго-Вятскому банку"],
@@ -290,22 +289,17 @@ export default class DocxGenerator {
             attrs.procsKPsRemove = ` ${procsKPsRemove} `;
         }
 
-        // Из AutomatedSystems
         if (automatedSystems.items && automatedSystems.items.length > 0) {
             const askiList = automatedSystems.items.map(item => {
                 const sysId = Math.abs(parseInt(item.systemId.replace(/\D/g, '') || '0'));
-                const roles = item.roles && item.roles.length > 0 
-                    ? item.roles.map(r => r.roleIndex || '0').join(',')
+                // Роли передаём через $, чтобы при split('$') каждая стала отдельным элементом
+                const rolesStr = item.roles && item.roles.length > 0
+                    ? item.roles.map(r => r.roleIndex || '0').join('$')
                     : '-1';
-                const proc = item.processCode ? item.processCode.replace('П', '') : '';
-                const kp = item.pathCode ? item.pathCode.replace('КП', '') : '';
-                
-                // Сотрудники
                 const employees = item.employees && item.employees.length > 0
                     ? item.employees.map(emp => `${emp.fullName}(${emp.tabNumber})^${emp.position}^${emp.bank}`).join(',')
                     : '-1';
-                
-                return `${sysId},${roles},${proc},${kp},{${employees}}`;
+                return [sysId, rolesStr, `{${employees}}`].join('$');
             });
             attrs.aski = ` ${askiList.join('%')} `;
         }
