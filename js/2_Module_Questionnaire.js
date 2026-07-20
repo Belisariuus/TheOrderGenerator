@@ -267,6 +267,7 @@ export default class Module2 {
         return `
             <div class="form-group">
                 <label for="auditName">Название проверки <span class="required">*</span></label>
+                <span class="hint-text">О подготовке к аудиторской проверке &lt;ваш текст&gt;</span>
                 <input type="text" id="auditName" placeholder="Введите название проверки">
             </div>
 
@@ -317,6 +318,7 @@ export default class Module2 {
         return `
             <div class="form-group">
                 <label for="auditName">Название проверки <span class="required">*</span></label>
+                <span class="hint-text">О проведении аудиторской проверки &lt;ваш текст&gt;</span>
                 <input type="text" id="auditName" placeholder="Введите название проверки">
             </div>
 
