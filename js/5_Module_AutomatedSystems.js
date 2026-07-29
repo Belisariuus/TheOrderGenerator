@@ -504,6 +504,11 @@ export default class Module5 {
         // Формируем отображение сотрудников
         let employeesDisplay = 'Все сотрудники приложения 1';
         const selectedEmployeesArray = Array.from(this.selectedEmployees);
+
+        const selectedEmployeesData = selectedEmployeesArray
+            .map(id => this.employees.find(emp => emp.id === id))
+            .filter(Boolean);
+
         if (selectedEmployeesArray.length > 0) {
             const employeeNames = selectedEmployeesArray.map(id => {
                 const emp = this.employees.find(e => e.id === id);
@@ -529,7 +534,7 @@ export default class Module5 {
             systemName: system.name,
             roles: selectedRolesArray,
             rolesDisplay: rolesDisplay,
-            employees: selectedEmployeesArray,
+            employees: selectedEmployeesData,
             employeesDisplay: employeesDisplay
         });
 

@@ -402,3 +402,15 @@ mark {
     font-size: 12px;
     color: #666;
 }
+
+.access-level-wrapper {
+    margin-top: 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.access-level-select {
+    min-width: 80px;
+    padding: 4px 8px;
+}

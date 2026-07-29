@@ -64,7 +64,7 @@ export default class DocxGenerator {
             '',
             'подготовки к аудиторской проверке',
             'для подготовки аудиторской проверки',
-            'подготовки к аудиторской проверке',
+            'подготовки аудиторской проверки',
             'подготовку аудиторской проверки',
             '',
             'начать',
@@ -237,7 +237,7 @@ export default class DocxGenerator {
         // Команда проверки
         if (teamAudit.teamMembers && teamAudit.teamMembers.length > 0) {
             attrs.emps = teamAudit.teamMembers.map(emp => 
-                `${emp.fullName}(${emp.tabNumber}),${emp.department},${emp.position},${emp.bank}`
+                `${emp.fullName}(${emp.tabNumber}),${emp.department},${emp.position},${emp.bank},${emp.accessLevel}`
             ).join(';');
         } else {
             attrs.emps = '';
@@ -290,18 +290,9 @@ export default class DocxGenerator {
         }
 
         if (automatedSystems.items && automatedSystems.items.length > 0) {
-            const askiList = automatedSystems.items.map(item => {
-                const sysId = Math.abs(parseInt(item.systemId.replace(/\D/g, '') || '0'));
-                // Роли передаём через $, чтобы при split('$') каждая стала отдельным элементом
-                const rolesStr = item.roles && item.roles.length > 0
-                    ? item.roles.map(r => r.roleIndex || '0').join('$')
-                    : '-1';
-                const employees = item.employees && item.employees.length > 0
-                    ? item.employees.map(emp => `${emp.fullName}(${emp.tabNumber})^${emp.position}^${emp.bank}`).join(',')
-                    : '-1';
-                return [sysId, rolesStr, `{${employees}}`].join('$');
-            });
-            attrs.aski = ` ${askiList.join('%')} `;
+            // Приложение 3 теперь формируется как готовая XML-таблица (см. buildAppendix3TableXml),
+            // поэтому исходные данные передаются как есть, без кодирования в строку
+            attrs.aski = automatedSystems.items;
         }
 
         // Пользователь (заглушка, можно передать дополнительно)
@@ -309,6 +300,166 @@ export default class DocxGenerator {
         attrs.email = 'user@example.com';
 
         return attrs;
+    }
+
+    /**
+     * Экранирует спецсимволы для безопасной вставки текста в OOXML
+     */
+    escapeXml(str) {
+        return String(str ?? '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&apos;');
+    }
+
+    /**
+     * Строит параграфы ячейки таблицы (поддерживает многострочный текст через \n,
+     * например список ролей, где каждая роль пишется с новой строки)
+     */
+    buildCellParagraphs(text, { bold = false, align = 'center' } = {}) {
+        const lines = String(text ?? '').split('\n');
+        // Times New Roman, 12pt (w:sz указывается в полупунктах, поэтому 12pt = 24)
+        const rPr = `<w:rPr><w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman" w:cs="Times New Roman"/><w:sz w:val="24"/><w:szCs w:val="24"/>${bold ? '<w:b/>' : ''}</w:rPr>`;
+        return lines.map(line => `<w:p><w:pPr><w:jc w:val="${align}"/>${rPr}</w:pPr><w:r>${rPr}<w:t xml:space="preserve">${this.escapeXml(line)}</w:t></w:r></w:p>`).join('');
+    }
+
+    /**
+     * Строит одну ячейку таблицы (<w:tc>) с поддержкой вертикального (vMerge)
+     * и горизонтального (gridSpan) объединения ячеек
+     */
+    buildTableCell(text, { width, bold = false, align = 'center', gridSpan = null, vMerge = null, fill = null, noWrap = false } = {}) {
+        const tcPrParts = [`<w:tcW w:w="${width}" w:type="pct"/>`];
+        if (gridSpan) tcPrParts.push(`<w:gridSpan w:val="${gridSpan}"/>`);
+        if (vMerge === 'restart') tcPrParts.push(`<w:vMerge w:val="restart"/>`);
+        if (vMerge === 'continue') tcPrParts.push(`<w:vMerge/>`);
+        if (fill) tcPrParts.push(`<w:shd w:val="clear" w:color="auto" w:fill="${fill}"/>`);
+        if (noWrap) tcPrParts.push(`<w:noWrap/>`);
+        tcPrParts.push(`<w:vAlign w:val="center"/>`);
+
+        // Ячейка-продолжение вертикального объединения должна быть пустой
+        const content = vMerge === 'continue' ? '<w:p/>' : this.buildCellParagraphs(text, { bold, align });
+
+        return `<w:tc><w:tcPr>${tcPrParts.join('')}</w:tcPr>${content}</w:tc>`;
+    }
+
+    /**
+     * Формирует таблицу Приложения 3 "Перечень информационных ресурсов Банка,
+     * к которым необходимо оформить доступ..." как готовый OOXML-фрагмент
+     * (вместо заполнения статического шаблона через цикл docxtemplater).
+     *
+     * Принимает items из модуля AutomatedSystems в исходном виде, например:
+     * { systemId, systemName, roles: string[], employees: [{fullName, position, tabNumber}] }
+     *
+     * Правила формирования:
+     * - Если выбрана только АС (нет ни ролей, ни сотрудников) - колонка "Необходимая роль/группа
+     *   доступа" заполняется типовой фразой, а колонки ФИО/Должность/Табельный номер
+     *   объединяются по горизонтали с текстом "Все участники (Приложение 1)".
+     * - Если указаны роли и/или сотрудники - на каждого сотрудника формируется отдельная строка,
+     *   а колонки "№ п/п", "Наименование информационного ресурса", "Номер информационного
+     *   ресурса (КЭ)" и "Необходимая роль/группа доступа" объединяются по вертикали на
+     *   количество сотрудников; все роли перечисляются в одной ячейке, каждая с новой строки.
+     */
+    buildAppendix3TableXml(items) {
+        if (!items || items.length === 0) return '';
+
+        // Ширины колонок в тысячных долях процента (сумма = 5000, т.е. 100%)
+        // Колонка табельного номера расширена, чтобы номер помещался на 1 строку
+        const COLW = {
+            num: 200,   // № п/п
+            name: 850,  // Наименование информационного ресурса
+            ke: 720,    // Номер информационного ресурса (КЭ)
+            role: 1000,  // Необходимая роль/группа доступа
+            fio: 950,   // ФИО сотрудника
+            post: 700,  // Должность
+            tn: 550     // Табельный номер
+        };
+
+        const HEADER_FILL = 'EDEDED';
+        const ROLE_PLACEHOLDER = 'Роль, позволяющая просматривать необходимую информацию в рамках проверки.';
+        const ALL_PARTICIPANTS = 'Все участники (Приложение 1)';
+
+        const headerCells = [
+            this.buildTableCell('№ п/п', { width: COLW.num, bold: true, fill: HEADER_FILL }),
+            this.buildTableCell('Наименование информационного ресурса', { width: COLW.name, bold: true, fill: HEADER_FILL }),
+            this.buildTableCell('Номер информационного ресурса (КЭ)', { width: COLW.ke, bold: true, fill: HEADER_FILL }),
+            this.buildTableCell('Необходимая роль/группа доступа', { width: COLW.role, bold: true, fill: HEADER_FILL }),
+            this.buildTableCell('ФИО сотрудника', { width: COLW.fio, bold: true, fill: HEADER_FILL }),
+            this.buildTableCell('Должность', { width: COLW.post, bold: true, fill: HEADER_FILL }),
+            this.buildTableCell('Табельный номер', { width: COLW.tn, bold: true, fill: HEADER_FILL }),
+        ].join('');
+        const headerRow = `<w:tr><w:trPr><w:tblHeader/></w:trPr>${headerCells}</w:tr>`;
+
+        const bodyRows = [];
+        let rowNum = 1;
+
+        for (const item of items) {
+            const roles = Array.isArray(item.roles) ? item.roles.filter(Boolean) : [];
+            const employees = Array.isArray(item.employees) ? item.employees : [];
+
+            const roleText = roles.length > 0 ? roles.join('\n') : ROLE_PLACEHOLDER;
+            // Кол-во строк в блоке ресурса: по одной строке на сотрудника,
+            // если сотрудники не указаны - одна строка "Все участники"
+            const rowsInBlock = employees.length > 0 ? employees.length : 1;
+
+            for (let r = 0; r < rowsInBlock; r++) {
+                const isFirstRow = r === 0;
+                const vMergeMode = rowsInBlock > 1 ? (isFirstRow ? 'restart' : 'continue') : null;
+
+                const cells = [];
+                cells.push(this.buildTableCell(isFirstRow ? String(rowNum) : '', { width: COLW.num, vMerge: vMergeMode }));
+                cells.push(this.buildTableCell(isFirstRow ? (item.systemName || '') : '', { width: COLW.name, vMerge: vMergeMode }));
+                cells.push(this.buildTableCell(isFirstRow ? (item.systemId || '') : '', { width: COLW.ke, vMerge: vMergeMode }));
+                cells.push(this.buildTableCell(isFirstRow ? roleText : '', { width: COLW.role, vMerge: vMergeMode }));
+
+                if (employees.length === 0) {
+                    // Только АС выбрана - объединяем ФИО/Должность/Табельный номер по горизонтали
+                    cells.push(this.buildTableCell(ALL_PARTICIPANTS, {
+                        width: COLW.fio + COLW.post + COLW.tn,
+                        gridSpan: 3
+                    }));
+                } else {
+                    const emp = employees[r];
+                    cells.push(this.buildTableCell(emp?.fullName || '', { width: COLW.fio }));
+                    cells.push(this.buildTableCell(emp?.position || '', { width: COLW.post }));
+                    // noWrap, чтобы табельный номер всегда помещался на одну строку ячейки
+                    cells.push(this.buildTableCell(emp?.tabNumber || '', { width: COLW.tn, noWrap: true }));
+                }
+
+                bodyRows.push(`<w:tr>${cells.join('')}</w:tr>`);
+            }
+
+            rowNum++;
+        }
+
+        return `<w:tbl>` +
+            `<w:tblPr>` +
+                `<w:tblStyle w:val="TableGrid"/>` +
+                `<w:tblW w:w="5000" w:type="pct"/>` +
+                `<w:tblBorders>` +
+                    `<w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/>` +
+                    `<w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/>` +
+                    `<w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/>` +
+                    `<w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/>` +
+                    `<w:insideH w:val="single" w:sz="4" w:space="0" w:color="000000"/>` +
+                    `<w:insideV w:val="single" w:sz="4" w:space="0" w:color="000000"/>` +
+                `</w:tblBorders>` +
+                `<w:tblLayout w:type="fixed"/>` +
+                `<w:tblLook w:val="04A0" w:firstRow="1" w:lastRow="0" w:firstColumn="1" w:lastColumn="0" w:noHBand="0" w:noVBand="1"/>` +
+            `</w:tblPr>` +
+            `<w:tblGrid>` +
+                `<w:gridCol w:w="${COLW.num}"/>` +
+                `<w:gridCol w:w="${COLW.name}"/>` +
+                `<w:gridCol w:w="${COLW.ke}"/>` +
+                `<w:gridCol w:w="${COLW.role}"/>` +
+                `<w:gridCol w:w="${COLW.fio}"/>` +
+                `<w:gridCol w:w="${COLW.post}"/>` +
+                `<w:gridCol w:w="${COLW.tn}"/>` +
+            `</w:tblGrid>` +
+            headerRow +
+            bodyRows.join('') +
+        `</w:tbl>`;
     }
 
     /**
@@ -404,15 +555,10 @@ export default class DocxGenerator {
         this.userLogin = dictAttributesJson['user'];
         this.userEmail = dictAttributesJson['email'];
 
-        // Обработка автоматизированных систем
-        if (dictAttributesJson['aski'] && dictAttributesJson['aski'].length > 1) {
-            this.listAutomatedSystemsAudit = dictAttributesJson['aski']
-                .trim(' %')
-                .split('%')
-                .map(col => col.split('$'));
-        } else {
-            this.listAutomatedSystemsAudit = null;
-        }
+        // Автоматизированные системы (Приложение 3) - приходят уже готовым массивом объектов
+        this.automatedSystemsItems = Array.isArray(dictAttributesJson['aski']) && dictAttributesJson['aski'].length > 0
+            ? dictAttributesJson['aski']
+            : null;
 
         // Определение типа распоряжения (изменение или нет)
         this.flagIsChange = 'provNum' in dictAttributesJson ? 1 : 0;
@@ -560,7 +706,8 @@ export default class DocxGenerator {
                 tb: this.dictNameTB[emp[3]][0],
                 i: String(i + 1),
                 fio: fio,
-                tn: tn
+                tn: tn,
+                lvl: emp[4]
             });
         }
 
@@ -653,97 +800,11 @@ export default class DocxGenerator {
             countProcessClientPath = strCountProcess;
         }
 
-        // Словари для генерации таблицы с доступами
-        let listDictAutomatedSystems = [];
-        if (this.listAutomatedSystemsAudit) {
-            let i = 0;
-            for (const AS of this.listAutomatedSystemsAudit) {
-                i++;
-                let first = true;
-                const emp_tns = AS[AS.length - 1].slice(1, -1).split(',');
-                const systemId = Math.abs(parseInt(AS[0]));
-                const systemData = this.getSystemById(systemId);
-
-                for (const emp_tn of emp_tns) {
-                    const dictAutomatedSystems = {};
-                    if (!first) {
-                        dictAutomatedSystems.i = '';
-                        dictAutomatedSystems.name = '';
-                        dictAutomatedSystems.ke = '';
-                        dictAutomatedSystems.roles = '';
-                        dictAutomatedSystems.kp = '';
-                        dictAutomatedSystems.proc = '';
-                        dictAutomatedSystems.emp_name = '';
-                        dictAutomatedSystems.title = '';
-                        dictAutomatedSystems.tn = '';
-                        // Флаги для объединения ячеек сотрудника
-                        dictAutomatedSystems.emp_name_empty = true;
-                        dictAutomatedSystems.title_empty = true;
-                        dictAutomatedSystems.tn_empty = true;
-                    } else {
-                        dictAutomatedSystems.i = String(i);
-                        // Получаем данные о системе из systemData (вместо Excel)
-                        const sysName = systemData ? systemData.name : `Система ${systemId}`;
-                        const sysDesc = systemData && systemData.description 
-                            ? systemData.description
-                            : 'Автоматизированная система';
-                        
-                        dictAutomatedSystems.name = sysName;
-                        dictAutomatedSystems.ke = `${sysDesc}\r\nAS${systemId}`;
-                        dictAutomatedSystems.kp = AS[AS.length - 2];
-                        dictAutomatedSystems.proc = AS[AS.length - 3];
-
-                        if (parseInt(AS[0]) < 0) {
-                            dictAutomatedSystems.name += ' (+реплика)';
-                        }
-
-                        if (AS[1] === '-1') {
-                            dictAutomatedSystems.roles = 'Роль, позволяющая просматривать необходимую информацию в рамках проверки.';
-                        } else {
-                            const roleIndices = AS.slice(1, AS.length - 3);
-                            dictAutomatedSystems.roles = roleIndices
-                                .map(role_index => {
-                                    const roleIndexNum = parseInt(role_index);
-                                    const roleRow = systemData && systemData.roles && systemData.roles[roleIndexNum - 1] ? {name: systemData.roles[roleIndexNum - 1]} : null;
-                                    return roleRow ? roleRow['name'] : '';
-                                })
-                                .join('\r\n');
-                        }
-                    }
-
-                    if (emp_tn === '-1') {
-                        dictAutomatedSystems.emp_name = 'Все участники (Приложение 1)';
-                        dictAutomatedSystems.title = '';
-                        dictAutomatedSystems.tn = '';
-                        // Флаги для объединения ячеек сотрудника
-                        dictAutomatedSystems.emp_name_empty = true;
-                        dictAutomatedSystems.title_empty = true;
-                        dictAutomatedSystems.tn_empty = true;
-                    } else {
-                        const cur_emp = listDictEmployees.find(e => e.tn === emp_tn);
-                        if (cur_emp) {
-                            dictAutomatedSystems.emp_name = cur_emp.fio;
-                            dictAutomatedSystems.title = this.getFullTitle(cur_emp.title, cur_emp.tb);
-                            dictAutomatedSystems.tn = cur_emp.tn;
-                            // Флаги для объединения ячеек сотрудника
-                            dictAutomatedSystems.emp_name_empty = false;
-                            dictAutomatedSystems.title_empty = false;
-                            dictAutomatedSystems.tn_empty = false;
-                        } else {
-                            dictAutomatedSystems.emp_name = '';
-                            dictAutomatedSystems.title = '';
-                            dictAutomatedSystems.tn = '';
-                            dictAutomatedSystems.emp_name_empty = true;
-                            dictAutomatedSystems.title_empty = true;
-                            dictAutomatedSystems.tn_empty = true;
-                        }
-                    }
-
-                    first = false;
-                    listDictAutomatedSystems.push(dictAutomatedSystems);
-                }
-            }
-        }
+        // Приложение 3: таблица генерируется как готовый XML-фрагмент (см. buildAppendix3TableXml),
+        // а не через построчное заполнение шаблона циклом docxtemplater
+        const appendix3TableXml = this.automatedSystemsItems
+            ? this.buildAppendix3TableXml(this.automatedSystemsItems)
+            : '';
 
         // Форматирование дат
         const formatDate = (dateStr) => {
@@ -881,8 +942,10 @@ export default class DocxGenerator {
             dictOrder.showTB = false;
         }
 
-        if (this.listAutomatedSystemsAudit && listDictAutomatedSystems && listDictAutomatedSystems.length > 0) {
-            dictOrder.aski = listDictAutomatedSystems;
+        if (appendix3TableXml) {
+            // {@aski_table} - тег "сырого" XML (rawXml), встроенная возможность docxtemplater:
+            // подставляет весь OOXML целиком, заменяя параграф с этим тегом в шаблоне
+            dictOrder.aski_table = appendix3TableXml;
             dictOrder.showApp3 = true;
             dictOrder.showLinkApp3 = true;
         } else {
@@ -1193,91 +1256,11 @@ export default class DocxGenerator {
             countRemoveProcessesClientPath = strCountProcess;
         }
 
-        // Словари для генерации таблицы с доступами
-        let listDictAutomatedSystems = [];
-        if (this.listAutomatedSystemsAudit) {
-            let i = 0;
-            for (const AS of this.listAutomatedSystemsAudit) {
-                i++;
-                let first = true;
-                const emps = AS[AS.length - 1].slice(1, -1).split(',');
-                const systemId = Math.abs(parseInt(AS[0]));
-                const systemData = this.getSystemById(systemId);
-
-                for (const emp of emps) {
-                    const dictAutomatedSystems = {};
-                    if (!first) {
-                        dictAutomatedSystems.i = '';
-                        dictAutomatedSystems.name = '';
-                        dictAutomatedSystems.ke = '';
-                        dictAutomatedSystems.roles = '';
-                        dictAutomatedSystems.kp = '';
-                        dictAutomatedSystems.proc = '';
-                        // Флаги для объединения ячеек в АС
-                        dictAutomatedSystems.i_empty = true;
-                        dictAutomatedSystems.name_empty = true;
-                        dictAutomatedSystems.ke_empty = true;
-                        dictAutomatedSystems.roles_empty = true;
-                        dictAutomatedSystems.kp_empty = true;
-                        dictAutomatedSystems.proc_empty = true;
-                    } else {
-                        dictAutomatedSystems.i = String(i);
-                        // Получаем данные о системе из systemData (вместо Excel)
-                        const sysName2 = systemData ? systemData.name : `Система ${systemId}`;
-                        const sysDesc2 = systemData && systemData.description 
-                            ? systemData.description
-                            : 'Автоматизированная система';
-                        
-                        dictAutomatedSystems.name = sysName2;
-                        dictAutomatedSystems.ke = `${sysDesc2}\r\nAS${systemId}`;
-                        dictAutomatedSystems.kp = AS[AS.length - 2];
-                        dictAutomatedSystems.proc = AS[AS.length - 3];
-
-                        if (parseInt(AS[0]) < 0) {
-                            dictAutomatedSystems.name += ' (+реплика)';
-                        }
-
-                        if (AS[1] === '-1') {
-                            dictAutomatedSystems.roles = 'Роль, позволяющая просматривать необходимую информацию в рамках проверки.';
-                        } else {
-                            const roleIndices = AS.slice(1, AS.length - 3);
-                            dictAutomatedSystems.roles = roleIndices
-                                .map(role_index => {
-                                    const roleIndexNum = parseInt(role_index);
-                                    const roleRow = systemData && systemData.roles && systemData.roles[roleIndexNum - 1] ? {name: systemData.roles[roleIndexNum - 1]} : null;
-                                    return roleRow ? roleRow['name'] : '';
-                                })
-                                .join('\r\n');
-                        }
-                    }
-
-                    if (emp === '-1') {
-                        dictAutomatedSystems.emp_name = 'Все участники (Приложение 1)';
-                        dictAutomatedSystems.title = '';
-                        dictAutomatedSystems.tn = '';
-                        // Флаги для объединения ячеек сотрудника
-                        dictAutomatedSystems.emp_name_empty = true;
-                        dictAutomatedSystems.title_empty = true;
-                        dictAutomatedSystems.tn_empty = true;
-                    } else {
-                        const [emp_tn_fio, emp_title, emp_tb] = emp.split('^');
-                        const emp_fio = this.removeBrackets(emp_tn_fio);
-                        const emp_tn = emp_tn_fio.substring(emp_tn_fio.indexOf('(') + 1, emp_tn_fio.lastIndexOf(')'));
-
-                        dictAutomatedSystems.emp_name = emp_fio;
-                        dictAutomatedSystems.title = this.getFullTitle(emp_title, emp_tb);
-                        dictAutomatedSystems.tn = emp_tn;
-                        // Флаги для объединения ячеек сотрудника
-                        dictAutomatedSystems.emp_name_empty = false;
-                        dictAutomatedSystems.title_empty = false;
-                        dictAutomatedSystems.tn_empty = false;
-                    }
-
-                    first = false;
-                    listDictAutomatedSystems.push(dictAutomatedSystems);
-                }
-            }
-        }
+        // Приложение 3 (Приложение 4 в сценарии изменения): таблица генерируется как готовый
+        // XML-фрагмент (см. buildAppendix3TableXml), а не через построчное заполнение шаблона
+        const appendix3TableXml = this.automatedSystemsItems
+            ? this.buildAppendix3TableXml(this.automatedSystemsItems)
+            : '';
 
         // Форматирование дат
         const formatDate = (dateStr) => {
@@ -1389,8 +1372,9 @@ export default class DocxGenerator {
             dictOrder.showLinkApp3 = false;
         }
 
-        if (this.listAutomatedSystemsAudit && listDictAutomatedSystems && listDictAutomatedSystems.length > 0) {
-            dictOrder.aski = listDictAutomatedSystems;
+        if (appendix3TableXml) {
+            // {@aski_table} - тег "сырого" XML (rawXml), встроенная возможность docxtemplater
+            dictOrder.aski_table = appendix3TableXml;
             dictOrder.showApp4 = true;
             dictOrder.showLinkApp4 = true;
         } else {

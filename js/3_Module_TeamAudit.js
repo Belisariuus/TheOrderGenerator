@@ -488,14 +488,64 @@ export default class Module3 {
 
         const tag = document.createElement('div');
         tag.className = 'employee-tag';
-        tag.innerHTML = `
-            <div class="tag-content">
-                <span class="tag-name"><strong>${employee.fullName}</strong></span>
-                <span class="tag-details">${employee.position} | ${employee.department}</span>
-                <span class="tag-bank">${employee.bank}</span>
-            </div>
-            <button class="tag-remove" data-role="${role}" data-employee='${JSON.stringify(employee)}'>×</button>
-        `;
+        if (role === 'team') {
+
+            tag.innerHTML = `
+                <div class="tag-content">
+                    <span class="tag-name">
+                        <strong>${employee.fullName}</strong>
+                    </span>
+
+                    <span class="tag-details">
+                        ${employee.position} | ${employee.department}
+                    </span>
+
+                    <span class="tag-bank">${employee.bank}</span>
+
+                    <div class="access-level-wrapper">
+                        <label>Уровень доступа:</label>
+
+                        <select class="access-level-select">
+                            <option value="R0">R0</option>
+                            <option value="R1">R1</option>
+                            <option value="R2">R2</option>
+                            <option value="R3">R3</option>
+                        </select>
+                    </div>
+                </div>
+
+                <button
+                    class="tag-remove"
+                    data-role="${role}"
+                    data-employee='${JSON.stringify(employee)}'>
+                    ×
+                </button>
+            `;
+        }
+        else {
+            tag.innerHTML = `
+                <div class="tag-content">
+                    <span class="tag-name"><strong>${employee.fullName}</strong></span>
+                    <span class="tag-details">${employee.position} | ${employee.department}</span>
+                    <span class="tag-bank">${employee.bank}</span>
+                </div>
+                <button class="tag-remove"
+                        data-role="${role}"
+                        data-employee='${JSON.stringify(employee)}'>
+                    ×
+                </button>
+            `;
+        }
+
+        if (role === 'team') {
+
+            const accessSelect =
+                tag.querySelector('.access-level-select');
+
+            accessSelect.addEventListener('change', () => {
+                this.saveConfig();
+            });
+        }
 
         tagContainer.appendChild(tag);
 
@@ -763,12 +813,32 @@ export default class Module3 {
         // Команда
         const teamTags = this.container.querySelector('#teamTags');
         const teamMembers = [];
+
         if (teamTags) {
-            const tags = teamTags.querySelectorAll('.employee-tag');
+
+            const tags =
+                teamTags.querySelectorAll('.employee-tag');
+
             tags.forEach(tag => {
-                const removeBtn = tag.querySelector('.tag-remove');
-                if (removeBtn && removeBtn.dataset.employee) {
-                    teamMembers.push(JSON.parse(removeBtn.dataset.employee));
+
+                const removeBtn =
+                    tag.querySelector('.tag-remove');
+
+                const accessSelect =
+                    tag.querySelector('.access-level-select');
+
+                if (
+                    removeBtn &&
+                    removeBtn.dataset.employee
+                ) {
+
+                    const employee =
+                        JSON.parse(removeBtn.dataset.employee);
+
+                    employee.accessLevel =
+                        accessSelect?.value || 'R0';
+
+                    teamMembers.push(employee);
                 }
             });
         }
@@ -894,7 +964,32 @@ export default class Module3 {
             // Загружаем команду
             if (savedData.teamMembers && Array.isArray(savedData.teamMembers) && savedData.teamMembers.length > 0) {
                 savedData.teamMembers.forEach(employee => {
-                    this.createEmployeeTag('team', employee);
+
+                    this.createEmployeeTag(
+                        'team',
+                        employee
+                    );
+
+                    const teamTags =
+                        this.container.querySelector('#teamTags');
+
+                    const lastTag =
+                        teamTags.lastElementChild;
+
+                    if (
+                        lastTag &&
+                        employee.accessLevel
+                    ) {
+                        const select =
+                            lastTag.querySelector(
+                                '.access-level-select'
+                            );
+
+                        if (select) {
+                            select.value =
+                                employee.accessLevel;
+                        }
+                    }
                 });
             }
         } else if (this.currentScenario === 'change') {

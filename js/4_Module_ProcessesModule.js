@@ -180,15 +180,19 @@ export default class Module4 {
         );
     }
 
-    getFilteredProcessesForInclude() {
-        const selectedPathCodes = Array.from(this.selectedPathsForInclude);
-        if (selectedPathCodes.length === 0) {
-            return this.processes;
-        }
-        return this.processes.filter(process =>
-            process.linkedKP.some(kpCode => selectedPathCodes.includes(kpCode))
-        );
-    }
+	getFilteredProcessesForInclude() {
+	    const selectedProcessCodes = Array.from(this.selectedProcessesForInclude);
+
+	    // Если процесс не выбран — показываем все
+	    if (selectedProcessCodes.length === 0) {
+	        return this.processes;
+	    }
+
+	    // Показываем только выбранные процессы
+	    return this.processes.filter(process =>
+	        selectedProcessCodes.includes(process.code)
+	    );
+	}
 
     // Для исключения (change-exclude)
     getFilteredPathsForExclude() {
@@ -325,6 +329,11 @@ export default class Module4 {
                 <div class="processes-list-panel">
                     <h3>Процессы</h3>
                     <input type="text" id="searchProcesses" class="search-input" placeholder="Поиск..." value="${this.includeProcessSearchTerm}">
+                    <button id="clearProcessFilterBtn"
+                            class="btn btn-secondary"
+                            style="margin-top:8px;width:100%;">
+                        ✖ Очистить фильтр
+                    </button>
                     <div id="processesList" class="items-list">
                         ${this.renderProcessesList()}
                     </div>
@@ -497,7 +506,7 @@ export default class Module4 {
     }
 
     renderPathsList() {
-        let filtered = [...this.clientPaths];
+        let filtered = this.getFilteredPathsForInclude();
         if (this.includePathSearchTerm) {
             const term = this.includePathSearchTerm.toLowerCase();
             filtered = filtered.filter(p =>
@@ -700,6 +709,22 @@ export default class Module4 {
             });
         }
 
+        const clearFilterBtn =
+            this.container.querySelector('#clearProcessFilterBtn');
+
+        if (clearFilterBtn) {
+            clearFilterBtn.addEventListener('click', () => {
+                this.selectedProcessesForInclude.clear();
+
+                this.currentIncludeProcessPage = 1;
+                this.currentIncludePathPage = 1;
+
+                this.updateProcessesList();
+                this.updatePathsList();
+                this.renderPagination();
+            });
+        }
+
         const searchPaths = this.container.querySelector('#searchPaths');
         if (searchPaths) {
             searchPaths.addEventListener('input', (e) => {
@@ -863,25 +888,23 @@ export default class Module4 {
     }
 
 	pathClickHandler(e) {
-        const item = e.currentTarget;
-        const code = item.dataset.code;
-        const isCtrlPressed = e.ctrlKey;
+	    const item = e.currentTarget;
+	    const code = item.dataset.code;
+	    const isCtrlPressed = e.ctrlKey;
 
-        if (!isCtrlPressed) {
-            this.selectedPathsForInclude.clear();
-            this.selectedPathsForInclude.add(code);
-        } else {
-            if (this.selectedPathsForInclude.has(code)) {
-                this.selectedPathsForInclude.delete(code);
-            } else {
-                this.selectedPathsForInclude.add(code);
-            }
-        }
-        // Обновляем списки – теперь процессы будут отфильтрованы по выбранным КП
-        this.updatePathsList();       // обновить КП (подсветка)
-        this.updateProcessesList();   // обновить процессы (фильтрация)
-        this.renderPagination();
-    }
+	    if (!isCtrlPressed) {
+	        this.selectedPathsForInclude.clear();
+	        this.selectedPathsForInclude.add(code);
+	    } else {
+	        if (this.selectedPathsForInclude.has(code)) {
+	            this.selectedPathsForInclude.delete(code);
+	        } else {
+	            this.selectedPathsForInclude.add(code);
+	        }
+	    }
+
+	    this.updatePathsHighlight();
+	}
 
 	includeProcessClickHandler(e) {
 	    const item = e.currentTarget;
