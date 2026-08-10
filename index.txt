@@ -19,6 +19,8 @@
     <button id="downloadConfigBtn">Скачать конфиг</button>
     <button id="uploadConfigBtn">Загрузить конфиг</button>
     <input type="file" id="configFileInput" accept=".json" style="display: none;">
+    <button id="importDocxBtn">Загрузить из распоряжения</button>
+    <input type="file" id="docxFileInput" accept=".docx" style="display: none;">
     <button id="docxGenerate">Сформировать документ</button>
 </div>
 
@@ -39,6 +41,7 @@
     import Module4 from './js/4_Module_ProcessesModule.js';
     import Module5 from './js/5_Module_AutomatedSystems.js';
     import DocxGenerator from './js/6_Module_DocxGenerator.js';
+    import DocxImporter from './js/7_Module_DocxImporter.js';
     const configManager = window.appConfigManager;
 
     const modules = [
@@ -51,7 +54,7 @@
     ];
     const container = document.getElementById('modules-container');
     const moduleInstances = [];
-    
+
     modules.forEach(moduleInfo => {
         if (moduleInfo.name !== 'DocxGenerator') {
             const moduleInstance = new moduleInfo.class(configManager);
@@ -92,6 +95,32 @@
                 location.reload();
             } catch (e) {
                 alert('Ошибка при загрузке конфигурации: ' + e.message);
+            }
+            event.target.value = '';
+        }
+    });
+
+    // Импорт данных из готового распоряжения (Тест-2.docx)
+    // Заполняет формы Модуля 4 (клиентские пути и процессы) и Модуля 5
+    // (информационные ресурсы / АС) данными из загруженного документа.
+    document.getElementById('importDocxBtn').addEventListener('click', () => {
+        document.getElementById('docxFileInput').click();
+    });
+
+    document.getElementById('docxFileInput').addEventListener('change', async (event) => {
+        const file = event.target.files[0];
+        if (file) {
+            try {
+                const importer = new DocxImporter(configManager);
+                const parsed = await importer.importFromFile(file);
+                alert(
+                    'Данные из распоряжения загружены:\n' +
+                    `• Клиентские пути и процессы: ${parsed.processItems.length}\n` +
+                    `• Информационные ресурсы (АС): ${parsed.systemItems.length}`
+                );
+            } catch (e) {
+                console.error('Ошибка импорта из DOCX:', e);
+                alert('Ошибка при загрузке распоряжения: ' + e.message);
             }
             event.target.value = '';
         }

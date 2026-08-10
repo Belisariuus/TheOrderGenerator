@@ -243,23 +243,22 @@ export default class DocxGenerator {
             attrs.emps = '';
         }
 
-        // Изменения команды
-        if (teamAudit.changes) {
-            if (teamAudit.changes.include && teamAudit.changes.include.length > 0) {
-                attrs.addEmployees = teamAudit.changes.include.map(emp => 
-                    `${emp.fullName}(${emp.tabNumber}),${emp.department},${emp.position},${emp.bank}`
-                ).join(';');
-            }
-            if (teamAudit.changes.exclude && teamAudit.changes.exclude.length > 0) {
-                attrs.delEmployees = teamAudit.changes.exclude.map(emp => 
-                    `${emp.fullName}(${emp.tabNumber}),${emp.department},${emp.position},${emp.bank}`
-                ).join(';');
-            }
-            if (teamAudit.changes.signer) {
-                const signer = teamAudit.changes.signer;
-                attrs.podpis = `${signer.fullName}(${signer.tabNumber}),${signer.position}`;
-            }
+        // Изменения команды (сценарий "Изменение")
+        // ВАЖНО: Модуль 3 (TeamAudit) в saveChangeConfig() сохраняет include/exclude/signer/control
+        // ПЛОСКО, прямо в корне конфигурации модуля (через updateModuleConfig), а НЕ во
+        // вложенном объекте teamAudit.changes. Поэтому читаем их напрямую из teamAudit.
+        if (teamAudit.include && teamAudit.include.length > 0) {
+            attrs.addEmployees = teamAudit.include.map(emp => 
+                `${emp.fullName}(${emp.tabNumber}),${emp.department},${emp.position},${emp.bank}`
+            ).join(';');
         }
+        if (teamAudit.exclude && teamAudit.exclude.length > 0) {
+            attrs.delEmployees = teamAudit.exclude.map(emp => 
+                `${emp.fullName}(${emp.tabNumber}),${emp.department},${emp.position},${emp.bank}`
+            ).join(';');
+        }
+        // teamAudit.signer в сценарии "Изменение" тоже сохраняется плоско тем же ключом,
+        // что и в сценарии "Новое" - поэтому уже покрывается общим блоком выше (teamAudit.signer).
 
         // Из ProcessesModule
         if (processesModule.items && processesModule.items.length > 0) {
@@ -345,6 +344,28 @@ export default class DocxGenerator {
     }
 
     /**
+     * Строит ячейку заголовка таблицы, к тексту которой в конце добавлена
+     * метка сноски Word (<w:footnoteReference>), например для слова "ресурса".
+     * Сам текст сноски должен быть заранее собран в this.pendingFootnotes
+     * и встроен в документ через injectFootnotes.
+     */
+    buildHeaderCellWithFootnote(text, footnoteId, { width, fill = null } = {}) {
+        const rPr = `<w:rPr><w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman" w:cs="Times New Roman"/><w:sz w:val="24"/><w:szCs w:val="24"/><w:b/></w:rPr>`;
+        const footnoteRPr = `<w:rPr><w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman" w:cs="Times New Roman"/><w:sz w:val="24"/><w:szCs w:val="24"/><w:b/><w:vertAlign w:val="superscript"/></w:rPr>`;
+
+        const content = `<w:p><w:pPr><w:jc w:val="center"/>${rPr}</w:pPr>` +
+            `<w:r>${rPr}<w:t xml:space="preserve">${this.escapeXml(text)}</w:t></w:r>` +
+            `<w:r>${footnoteRPr}<w:footnoteReference w:id="${footnoteId}"/></w:r>` +
+            `</w:p>`;
+
+        const tcPrParts = [`<w:tcW w:w="${width}" w:type="pct"/>`];
+        if (fill) tcPrParts.push(`<w:shd w:val="clear" w:color="auto" w:fill="${fill}"/>`);
+        tcPrParts.push(`<w:vAlign w:val="center"/>`);
+
+        return `<w:tc><w:tcPr>${tcPrParts.join('')}</w:tcPr>${content}</w:tc>`;
+    }
+
+    /**
      * Формирует таблицу Приложения 3 "Перечень информационных ресурсов Банка,
      * к которым необходимо оформить доступ..." как готовый OOXML-фрагмент
      * (вместо заполнения статического шаблона через цикл docxtemplater).
@@ -362,15 +383,16 @@ export default class DocxGenerator {
      *   количество сотрудников; все роли перечисляются в одной ячейке, каждая с новой строки.
      */
     buildAppendix3TableXml(items) {
+        this.pendingFootnotes = null;
         if (!items || items.length === 0) return '';
 
         // Ширины колонок в тысячных долях процента (сумма = 5000, т.е. 100%)
         // Колонка табельного номера расширена, чтобы номер помещался на 1 строку
         const COLW = {
             num: 200,   // № п/п
-            name: 850,  // Наименование информационного ресурса
-            ke: 720,    // Номер информационного ресурса (КЭ)
-            role: 1000,  // Необходимая роль/группа доступа
+            name: 950,  // Наименование информационного ресурса
+            ke: 700,    // Номер информационного ресурса (КЭ)
+            role: 950,  // Необходимая роль/группа доступа
             fio: 950,   // ФИО сотрудника
             post: 700,  // Должность
             tn: 550     // Табельный номер
@@ -380,9 +402,14 @@ export default class DocxGenerator {
         const ROLE_PLACEHOLDER = 'Роль, позволяющая просматривать необходимую информацию в рамках проверки.';
         const ALL_PARTICIPANTS = 'Все участники (Приложение 1)';
 
+        // Сноска к слову "ресурса" в заголовке столбца "Наименование информационного ресурса"
+        const FOOTNOTE_ID = 101;
+        const FOOTNOTE_TEXT = 'Сокращения по тексту используются согласно Технологической схеме процесса «Управление Каталогом ИТ-услуг» в ПАО Сбербанк от 20.10.2020 № 4381-3';
+        this.pendingFootnotes = [{ id: FOOTNOTE_ID, text: FOOTNOTE_TEXT }];
+
         const headerCells = [
             this.buildTableCell('№ п/п', { width: COLW.num, bold: true, fill: HEADER_FILL }),
-            this.buildTableCell('Наименование информационного ресурса', { width: COLW.name, bold: true, fill: HEADER_FILL }),
+            this.buildHeaderCellWithFootnote('Наименование информационного ресурса', FOOTNOTE_ID, { width: COLW.name, fill: HEADER_FILL }),
             this.buildTableCell('Номер информационного ресурса (КЭ)', { width: COLW.ke, bold: true, fill: HEADER_FILL }),
             this.buildTableCell('Необходимая роль/группа доступа', { width: COLW.role, bold: true, fill: HEADER_FILL }),
             this.buildTableCell('ФИО сотрудника', { width: COLW.fio, bold: true, fill: HEADER_FILL }),
@@ -618,6 +645,14 @@ export default class DocxGenerator {
             [this.dateOldEndAudit, this.dateNewEndAudit] = dictAttributesJson['dates'].split(',');
             this.numberOrderAudit = dictAttributesJson['provNum'];
             this.textReason = dictAttributesJson['reason'];
+
+            // Дата направления акта (актуально для "проведение -> изменение");
+            // раньше не парсилась, из-за чего пункт 2 распоряжения никогда не показывался
+            if (dictAttributesJson['act_date'] && dictAttributesJson['act_date'].length > 1) {
+                this.dateAct = dictAttributesJson['act_date'];
+            } else {
+                this.dateAct = null;
+            }
 
             if (dictAttributesJson['procsKPsAdd'] && dictAttributesJson['procsKPsAdd'].length > 1) {
                 this.newListProcessesAudit = dictAttributesJson['procsKPsAdd']
@@ -903,7 +938,6 @@ export default class DocxGenerator {
             act_date: dateActFull,
             curator: stringCurators,
             supervisor: `${headAuditFIO} – ${headAuditPost}`,
-            subsuper: `${deputyHeadFIO} – ${deputyHeadPost}`,
             curator_plur: plurCurators,
             dir: empExecutionControl,
             podpis_title: signatoryPost,
@@ -912,6 +946,15 @@ export default class DocxGenerator {
             pril_aski: 3,
             ca_tb: ca_tb
         };
+
+        // Зам руководитель отображается только если он был выбран
+        if (this.dataDeputyHeadAudit) {
+            dictOrder.subsuper = `${deputyHeadFIO} – ${deputyHeadPost}`;
+            dictOrder.showSubsuper = true;
+        } else {
+            dictOrder.subsuper = '';
+            dictOrder.showSubsuper = false;
+        }
 
         // Передаем данные приложений только если они есть, иначе ставим флаги false
         if (listDictEmployees && listDictEmployees.length > 0) {
@@ -938,8 +981,10 @@ export default class DocxGenerator {
             dictOrder.TB_full_name = this.dictNameTB[this.nameTB][0].toUpperCase();
             dictOrder.TB_full_name2 = 'ПО ' + this.dictNameTB[this.nameTB][1].toUpperCase();
             dictOrder.showTB = true;
+            dictOrder.podrazdelenie = 'территориального банка';
         } else {
             dictOrder.showTB = false;
+            dictOrder.podrazdelenie = 'центрального аппарата';
         }
 
         if (appendix3TableXml) {
@@ -1319,11 +1364,7 @@ export default class DocxGenerator {
             act_date: dateActFull,
             dir: empExecutionControl,
             podpis_title: signatoryPost,
-            podpis_fio: signatoryFIO,
-            pril_emp: 1,
-            pril_add: 2,
-            pril_rem: 3,
-            pril_aski: 4
+            podpis_fio: signatoryFIO
         };
 
         if (this.flagIsTB) {
@@ -1334,56 +1375,115 @@ export default class DocxGenerator {
             dictOrder.showTB = false;
         }
 
-        // Передаем данные приложений только если они есть, иначе ставим флаги false
-        if (this.listDataEmployeesAdd || this.listDataEmployeesDel) {
+        // Сквозная нумерация приложений: номер присваивается только тем приложениям,
+        // которые реально показываются в документе (в порядке emp -> add -> rem -> aski).
+        // Раньше номера при пропуске одного из приложений считались независимо друг от друга
+        // и "разъезжались" (например, pril_aski не учитывал отсутствие Приложения emp/add/rem).
+        const hasApp1 = !!(this.listDataEmployeesAdd || this.listDataEmployeesDel);
+        const hasApp2 = !!(this.newListProcessesAudit && listDictProcessesAdd && listDictProcessesAdd.length > 0);
+        const hasApp3 = !!(this.deleteListProcessesAudit && listDictProcessesRem && listDictProcessesRem.length > 0);
+        const hasApp4 = !!appendix3TableXml;
+
+        let prilCounter = 0;
+
+        dictOrder.showApp1 = hasApp1;
+        dictOrder.showLinkApp1 = hasApp1;
+        if (hasApp1) {
+            dictOrder.pril_emp = ++prilCounter;
             dictOrder.employees = listDictEmployees;
             dictOrder.ca_tb = ca_tb;
-            dictOrder.showApp1 = true;
-            dictOrder.showLinkApp1 = true;
-        } else {
-            dictOrder.pril_add = 1;
-            dictOrder.showApp1 = false;
-            dictOrder.showLinkApp1 = false;
         }
 
-        if (this.newListProcessesAudit && listDictProcessesAdd && listDictProcessesAdd.length > 0) {
+        dictOrder.showApp2 = hasApp2;
+        dictOrder.showLinkApp2 = hasApp2;
+        if (hasApp2) {
+            dictOrder.pril_add = ++prilCounter;
             dictOrder.kps_and_ps_count_add = countProcessClientPathAdd;
             dictOrder.processesAdded = listDictProcessesAdd;
-            dictOrder.showApp2 = true;
-            dictOrder.showLinkApp2 = true;
-        } else {
-            dictOrder.pril_rem = 1;
-            dictOrder.showApp2 = false;
-            dictOrder.showLinkApp2 = false;
         }
 
-        if (this.deleteListProcessesAudit && listDictProcessesRem && listDictProcessesRem.length > 0) {
+        dictOrder.showApp3 = hasApp3;
+        dictOrder.showLinkApp3 = hasApp3;
+        if (hasApp3) {
+            dictOrder.pril_rem = ++prilCounter;
             dictOrder.kps_and_ps_count_rem = countRemoveProcessesClientPath;
             dictOrder.processesRemoved = listDictProcessesRem;
-            dictOrder.showApp3 = true;
-            dictOrder.showLinkApp3 = true;
-        } else if (this.listDataEmployeesAdd || this.listDataEmployeesDel) {
-            dictOrder.pril_aski = 2;
-            dictOrder.showApp3 = false;
-            dictOrder.showLinkApp3 = false;
-        } else {
-            dictOrder.pril_aski = 1;
-            dictOrder.showApp3 = false;
-            dictOrder.showLinkApp3 = false;
         }
 
-        if (appendix3TableXml) {
+        dictOrder.showApp4 = hasApp4;
+        dictOrder.showLinkApp4 = hasApp4;
+        if (hasApp4) {
+            dictOrder.pril_aski = ++prilCounter;
             // {@aski_table} - тег "сырого" XML (rawXml), встроенная возможность docxtemplater
             dictOrder.aski_table = appendix3TableXml;
-            dictOrder.showApp4 = true;
-            dictOrder.showLinkApp4 = true;
-        } else {
-            dictOrder.showApp4 = false;
-            dictOrder.showLinkApp4 = false;
         }
 
         // Загрузка и рендеринг шаблона
         await this.renderTemplate(dictOrder, this.nameTemplate, this.pathTaskFolder);
+    }
+
+    /**
+     * Добавляет реальные сноски Word в документ, напрямую дописывая нужные
+     * части docx-архива (без платных модулей docxtemplater):
+     * - word/footnotes.xml - текст самих сносок
+     * - word/_rels/document.xml.rels - связь document.xml -> footnotes.xml
+     * - [Content_Types].xml - декларация типа контента для footnotes.xml
+     *
+     * footnotes: [{ id: number, text: string }] - ссылки <w:footnoteReference w:id="..."/>
+     * на эти id должны быть заранее вставлены в raw-XML (см. buildAppendix3TableXml)
+     */
+    injectFootnotes(zip, footnotes) {
+        if (!footnotes || footnotes.length === 0) return;
+
+        const FOOTNOTES_PATH = 'word/footnotes.xml';
+        const RELS_PATH = 'word/_rels/document.xml.rels';
+        const CT_PATH = '[Content_Types].xml';
+
+        // 1. word/footnotes.xml
+        const existingFootnotesFile = zip.file(FOOTNOTES_PATH);
+        let footnotesXml = existingFootnotesFile ? existingFootnotesFile.asText() : null;
+        if (!footnotesXml) {
+            footnotesXml =
+                '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+                '<w:footnotes xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">' +
+                '<w:footnote w:type="separator" w:id="-1"><w:p><w:r><w:separator/></w:r></w:p></w:footnote>' +
+                '<w:footnote w:type="continuationSeparator" w:id="0"><w:p><w:r><w:continuationSeparator/></w:r></w:p></w:footnote>' +
+                '</w:footnotes>';
+        }
+
+        const newEntries = footnotes.map(fn =>
+            `<w:footnote w:id="${fn.id}"><w:p><w:pPr><w:jc w:val="both"/></w:pPr>` +
+            `<w:r><w:rPr><w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman" w:cs="Times New Roman"/><w:sz w:val="20"/><w:vertAlign w:val="superscript"/></w:rPr><w:footnoteRef/></w:r>` +
+            `<w:r><w:rPr><w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman" w:cs="Times New Roman"/><w:sz w:val="20"/></w:rPr>` +
+            `<w:t xml:space="preserve"> ${this.escapeXml(fn.text)}</w:t></w:r></w:p></w:footnote>`
+        ).join('');
+
+        footnotesXml = footnotesXml.replace('</w:footnotes>', `${newEntries}</w:footnotes>`);
+        zip.file(FOOTNOTES_PATH, footnotesXml);
+
+        // 2. word/_rels/document.xml.rels - связь на footnotes.xml (если её ещё нет в шаблоне)
+        const relsFile = zip.file(RELS_PATH);
+        if (relsFile) {
+            let relsXml = relsFile.asText();
+            if (!relsXml.includes('footnotes.xml')) {
+                const usedIds = [...relsXml.matchAll(/Id="rId(\d+)"/g)].map(m => parseInt(m[1], 10));
+                const nextId = usedIds.length ? Math.max(...usedIds) + 1 : 1;
+                const rel = `<Relationship Id="rId${nextId}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/footnotes" Target="footnotes.xml"/>`;
+                relsXml = relsXml.replace('</Relationships>', `${rel}</Relationships>`);
+                zip.file(RELS_PATH, relsXml);
+            }
+        }
+
+        // 3. [Content_Types].xml - декларация типа контента для footnotes.xml
+        const ctFile = zip.file(CT_PATH);
+        if (ctFile) {
+            let ctXml = ctFile.asText();
+            if (!ctXml.includes('/word/footnotes.xml')) {
+                const override = '<Override PartName="/word/footnotes.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.footnotes+xml"/>';
+                ctXml = ctXml.replace('</Types>', `${override}</Types>`);
+                zip.file(CT_PATH, ctXml);
+            }
+        }
     }
 
     /**
@@ -1395,7 +1495,12 @@ export default class DocxGenerator {
             const arrayBuffer = await response.arrayBuffer();
 
             const zip = new PizZip(arrayBuffer);
-            
+
+            // Добавляем сноски (например, к таблице Приложения 3), если они были собраны
+            if (this.pendingFootnotes && this.pendingFootnotes.length > 0) {
+                this.injectFootnotes(zip, this.pendingFootnotes);
+            }
+
             // Создаем экземпляр docxtemplater с настройками для работы с условными блоками
             const doc = new window.docxtemplater(zip, {
                 paragraphLoop: true,

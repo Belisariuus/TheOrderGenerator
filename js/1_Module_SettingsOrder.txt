@@ -15,6 +15,17 @@ export default class Module1 {
             'Центрально-Чернозёмный банк',
             'Юго-Западный банк'
         ];
+
+        // Подписка на восстановление сессии / импорт файла,
+        // чтобы собственные поля модуля (радиокнопки, выбор ТБ)
+        // тоже обновлялись после reload/импорта конфигурации.
+        this.configManager.subscribe((moduleName, data, fullConfig) => {
+            if (moduleName === 'SessionRestore' || moduleName === 'FileImport') {
+                if (this.container) {
+                    this.loadSavedData();
+                }
+            }
+        });
     }
 
     render() {

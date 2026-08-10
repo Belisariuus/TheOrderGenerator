@@ -112,13 +112,14 @@ class ConfigManager {
                         this.saveStatus.set(moduleName, true);
                     }
                 });
+                // Рассылаем ТОЛЬКО событие 'SessionRestore'. Модули сами достают
+                // fullConfig.SettingsOrder и вызывают updateScenario(..., isRestore=true).
+                // Ранее здесь отдельно рассылалось событие 'SettingsOrder', но модули
+                // обрабатывают его с isRestore=false, что приводило к вызову
+                // clearModuleData() и стиранию только что восстановленных данных
+                // ДО того, как приходило само событие 'SessionRestore'.
                 setTimeout(() => {
-                    if (this.config.SettingsOrder && Object.keys(this.config.SettingsOrder).length > 0) {
-                        this.notifyListeners('SettingsOrder', this.config.SettingsOrder, this.config);
-                    }
-                    setTimeout(() => {
-                        this.notifyListeners('SessionRestore', null, this.config);
-                    }, 50);
+                    this.notifyListeners('SessionRestore', null, this.config);
                 }, 50);
                 return true;
             } catch (e) {
@@ -174,15 +175,10 @@ class ConfigManager {
                     // Сохраняем в sessionStorage
                     this.saveToSessionStorage();
 
-                    // Уведомляем подписчиков - сначала SettingsOrder для рендеринга других модулей
+                    // Рассылаем ТОЛЬКО событие 'FileImport' (см. пояснение в loadFromSessionStorage
+                    // про то, почему отдельное предварительное 'SettingsOrder' здесь вредно).
                     setTimeout(() => {
-                        if (this.config.SettingsOrder && Object.keys(this.config.SettingsOrder).length > 0) {
-                            this.notifyListeners('SettingsOrder', this.config.SettingsOrder, this.config);
-                        }
-                        // Затем полное уведомление
-                        setTimeout(() => {
-                            this.notifyListeners('FileImport', null, this.config);
-                        }, 50);
+                        this.notifyListeners('FileImport', null, this.config);
                     }, 50);
                     
                     console.log('✓ Конфигурация импортирована из файла');
