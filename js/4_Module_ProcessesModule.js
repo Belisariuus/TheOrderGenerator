@@ -25,7 +25,7 @@ export default class Module4 {
         this.currentIncludePathPage = 1;
         this.currentExcludeProcessPage = 1;
         this.currentExcludePathPage = 1;
-        this.itemsPerPage = 8;
+        this.itemsPerPage = 50;
         this.includeProcessSearchTerm = '';
         this.includePathSearchTerm = '';
         this.excludeProcessSearchTerm = '';
@@ -206,15 +206,12 @@ export default class Module4 {
     }
 
     getFilteredProcessesForExclude() {
-        const selectedProcessCodes = Array.from(this.selectedProcessesForExclude);
-
-        // Как в форме подготовки/проведения: если процесс не выбран — показываем все,
-        // иначе показываем только выбранные процессы
-        if (selectedProcessCodes.length === 0) {
+        const selectedPathCodes = Array.from(this.selectedPathsForExclude);
+        if (selectedPathCodes.length === 0) {
             return this.processes;
         }
         return this.processes.filter(process =>
-            selectedProcessCodes.includes(process.code)
+            process.linkedKP.some(kpCode => selectedPathCodes.includes(kpCode))
         );
     }
 
@@ -337,7 +334,7 @@ export default class Module4 {
                             style="margin-top:8px;width:100%;">
                         ✖ Очистить фильтр
                     </button>
-                    <div id="processesList" class="items-list">
+                    <div id="processesList" class="items-list" style="max-height:480px;overflow-y:auto;border:1px solid #e0e0e0;border-radius:4px;">
                         ${this.renderProcessesList()}
                     </div>
                     <div id="processesPagination" class="pagination"></div>
@@ -346,7 +343,7 @@ export default class Module4 {
                 <div class="paths-list-panel">
                     <h3>Клиентские пути</h3>
                     <input type="text" id="searchPaths" class="search-input" placeholder="Поиск..." value="${this.includePathSearchTerm}">
-                    <div id="pathsList" class="items-list">
+                    <div id="pathsList" class="items-list" style="max-height:480px;overflow-y:auto;border:1px solid #e0e0e0;border-radius:4px;">
                         ${this.renderPathsList()}
                     </div>
                     <div id="pathsPagination" class="pagination"></div>
@@ -403,12 +400,7 @@ export default class Module4 {
                     <div class="processes-list-panel">
                         <h4>Процессы для включения</h4>
                         <input type="text" id="searchIncludeProcesses" class="search-input" placeholder="Поиск..." value="${this.includeProcessSearchTerm}">
-                        <button id="clearIncludeProcessFilterBtn"
-                                class="btn btn-secondary"
-                                style="margin-top:8px;width:100%;">
-                            ✖ Очистить фильтр
-                        </button>
-                        <div id="includeProcessesList" class="items-list">
+                        <div id="includeProcessesList" class="items-list" style="max-height:480px;overflow-y:auto;border:1px solid #e0e0e0;border-radius:4px;">
                             ${this.renderProcessesListForInclude()}
                         </div>
                         <div id="includeProcessesPagination" class="pagination"></div>
@@ -416,14 +408,11 @@ export default class Module4 {
                     <div class="paths-list-panel">
                         <h4>Клиентские пути для включения</h4>
                         <input type="text" id="searchIncludePaths" class="search-input" placeholder="Поиск..." value="${this.includePathSearchTerm}">
-                        <div id="includePathsList" class="items-list">
+                        <div id="includePathsList" class="items-list" style="max-height:480px;overflow-y:auto;border:1px solid #e0e0e0;border-radius:4px;">
                             ${this.renderPathsListForInclude()}
                         </div>
                         <div id="includePathsPagination" class="pagination"></div>
                     </div>
-                </div>
-                <div class="selection-info">
-                    <p>💡 <strong>Подсказка:</strong> Кликните на элемент для одиночного выбора. Зажмите <strong>Ctrl</strong> для множественного выбора.</p>
                 </div>
                 <div class="button-container">
                     <button id="addIncludeBtn" class="btn btn-success">➕ Добавить выбранное для включения</button>
@@ -437,12 +426,7 @@ export default class Module4 {
                     <div class="processes-list-panel">
                         <h4>Процессы для исключения</h4>
                         <input type="text" id="searchExcludeProcesses" class="search-input" placeholder="Поиск..." value="${this.excludeProcessSearchTerm}">
-                        <button id="clearExcludeProcessFilterBtn"
-                                class="btn btn-secondary"
-                                style="margin-top:8px;width:100%;">
-                            ✖ Очистить фильтр
-                        </button>
-                        <div id="excludeProcessesList" class="items-list">
+                        <div id="excludeProcessesList" class="items-list" style="max-height:480px;overflow-y:auto;border:1px solid #e0e0e0;border-radius:4px;">
                             ${this.renderProcessesListForExclude()}
                         </div>
                         <div id="excludeProcessesPagination" class="pagination"></div>
@@ -450,14 +434,11 @@ export default class Module4 {
                     <div class="paths-list-panel">
                         <h4>Клиентские пути для исключения</h4>
                         <input type="text" id="searchExcludePaths" class="search-input" placeholder="Поиск..." value="${this.excludePathSearchTerm}">
-                        <div id="excludePathsList" class="items-list">
+                        <div id="excludePathsList" class="items-list" style="max-height:480px;overflow-y:auto;border:1px solid #e0e0e0;border-radius:4px;">
                             ${this.renderPathsListForExclude()}
                         </div>
                         <div id="excludePathsPagination" class="pagination"></div>
                     </div>
-                </div>
-                <div class="selection-info">
-                    <p>💡 <strong>Подсказка:</strong> Кликните на элемент для одиночного выбора. Зажмите <strong>Ctrl</strong> для множественного выбора.</p>
                 </div>
                 <div class="button-container">
                     <button id="addExcludeBtn" class="btn btn-danger">➖ Добавить выбранное для исключения</button>
@@ -516,10 +497,11 @@ export default class Module4 {
 
         return paginated.map(process => `
             <div class="item ${this.selectedProcessesForInclude.has(process.code) ? 'selected' : ''}"
-                 data-type="process" data-code="${process.code}">
-                <div class="item-code"><strong>${process.code}</strong></div>
-                <div class="item-name">${process.name}</div>
-                <div class="item-department">👥 ${process.ownerDepartment}</div>
+                 data-type="process" data-code="${process.code}"
+                 style="display:flex;align-items:center;gap:10px;padding:5px 10px;border-bottom:1px solid #eee;cursor:pointer;">
+                <div class="item-code" style="min-width:80px;flex-shrink:0;"><strong>${process.code}</strong></div>
+                <div class="item-name" style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${process.name}">${process.name}</div>
+                <div class="item-department" style="flex-shrink:0;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#888;font-size:12px;" title="${process.ownerDepartment}">👥 ${process.ownerDepartment}</div>
             </div>
         `).join('');
     }
@@ -543,10 +525,11 @@ export default class Module4 {
 
         return paginated.map(path => `
             <div class="item ${this.selectedPathsForInclude.has(path.code) ? 'selected' : ''}"
-                 data-type="path" data-code="${path.code}">
-                <div class="item-code"><strong>${path.code}</strong></div>
-                <div class="item-name">${path.name}</div>
-                <div class="item-department">👥 ${path.ownerDepartment}</div>
+                 data-type="path" data-code="${path.code}"
+                 style="display:flex;align-items:center;gap:10px;padding:5px 10px;border-bottom:1px solid #eee;cursor:pointer;">
+                <div class="item-code" style="min-width:80px;flex-shrink:0;"><strong>${path.code}</strong></div>
+                <div class="item-name" style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${path.name}">${path.name}</div>
+                <div class="item-department" style="flex-shrink:0;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#888;font-size:12px;" title="${path.ownerDepartment}">👥 ${path.ownerDepartment}</div>
             </div>
         `).join('');
     }
@@ -570,10 +553,11 @@ export default class Module4 {
 
         return paginated.map(process => `
             <div class="item ${this.selectedProcessesForInclude.has(process.code) ? 'selected' : ''}"
-                 data-type="process" data-code="${process.code}">
-                <div class="item-code"><strong>${process.code}</strong></div>
-                <div class="item-name">${process.name}</div>
-                <div class="item-department">👥 ${process.ownerDepartment}</div>
+                 data-type="process" data-code="${process.code}"
+                 style="display:flex;align-items:center;gap:10px;padding:5px 10px;border-bottom:1px solid #eee;cursor:pointer;">
+                <div class="item-code" style="min-width:80px;flex-shrink:0;"><strong>${process.code}</strong></div>
+                <div class="item-name" style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${process.name}">${process.name}</div>
+                <div class="item-department" style="flex-shrink:0;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#888;font-size:12px;" title="${process.ownerDepartment}">👥 ${process.ownerDepartment}</div>
             </div>
         `).join('');
     }
@@ -597,10 +581,11 @@ export default class Module4 {
 
         return paginated.map(path => `
             <div class="item ${this.selectedPathsForInclude.has(path.code) ? 'selected' : ''}"
-                 data-type="path" data-code="${path.code}">
-                <div class="item-code"><strong>${path.code}</strong></div>
-                <div class="item-name">${path.name}</div>
-                <div class="item-department">👥 ${path.ownerDepartment}</div>
+                 data-type="path" data-code="${path.code}"
+                 style="display:flex;align-items:center;gap:10px;padding:5px 10px;border-bottom:1px solid #eee;cursor:pointer;">
+                <div class="item-code" style="min-width:80px;flex-shrink:0;"><strong>${path.code}</strong></div>
+                <div class="item-name" style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${path.name}">${path.name}</div>
+                <div class="item-department" style="flex-shrink:0;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#888;font-size:12px;" title="${path.ownerDepartment}">👥 ${path.ownerDepartment}</div>
             </div>
         `).join('');
     }
@@ -624,10 +609,11 @@ export default class Module4 {
 
         return paginated.map(process => `
             <div class="item ${this.selectedProcessesForExclude.has(process.code) ? 'selected' : ''}"
-                 data-type="process" data-code="${process.code}">
-                <div class="item-code"><strong>${process.code}</strong></div>
-                <div class="item-name">${process.name}</div>
-                <div class="item-department">👥 ${process.ownerDepartment}</div>
+                 data-type="process" data-code="${process.code}"
+                 style="display:flex;align-items:center;gap:10px;padding:5px 10px;border-bottom:1px solid #eee;cursor:pointer;">
+                <div class="item-code" style="min-width:80px;flex-shrink:0;"><strong>${process.code}</strong></div>
+                <div class="item-name" style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${process.name}">${process.name}</div>
+                <div class="item-department" style="flex-shrink:0;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#888;font-size:12px;" title="${process.ownerDepartment}">👥 ${process.ownerDepartment}</div>
             </div>
         `).join('');
     }
@@ -651,10 +637,11 @@ export default class Module4 {
 
         return paginated.map(path => `
             <div class="item ${this.selectedPathsForExclude.has(path.code) ? 'selected' : ''}"
-                 data-type="path" data-code="${path.code}">
-                <div class="item-code"><strong>${path.code}</strong></div>
-                <div class="item-name">${path.name}</div>
-                <div class="item-department">👥 ${path.ownerDepartment}</div>
+                 data-type="path" data-code="${path.code}"
+                 style="display:flex;align-items:center;gap:10px;padding:5px 10px;border-bottom:1px solid #eee;cursor:pointer;">
+                <div class="item-code" style="min-width:80px;flex-shrink:0;"><strong>${path.code}</strong></div>
+                <div class="item-name" style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${path.name}">${path.name}</div>
+                <div class="item-department" style="flex-shrink:0;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#888;font-size:12px;" title="${path.ownerDepartment}">👥 ${path.ownerDepartment}</div>
             </div>
         `).join('');
     }
@@ -788,20 +775,6 @@ export default class Module4 {
             });
         }
 
-        const clearIncludeProcessFilterBtn = this.container.querySelector('#clearIncludeProcessFilterBtn');
-        if (clearIncludeProcessFilterBtn) {
-            clearIncludeProcessFilterBtn.addEventListener('click', () => {
-                this.selectedProcessesForInclude.clear();
-
-                this.currentIncludeProcessPage = 1;
-                this.currentIncludePathPage = 1;
-
-                this.updateIncludeProcessesList();
-                this.updateIncludePathsList();
-                this.renderChangePagination();
-            });
-        }
-
         // Исключение
         const searchExcludeProcesses = this.container.querySelector('#searchExcludeProcesses');
         if (searchExcludeProcesses) {
@@ -818,20 +791,6 @@ export default class Module4 {
             searchExcludePaths.addEventListener('input', (e) => {
                 this.excludePathSearchTerm = e.target.value;
                 this.currentExcludePathPage = 1;
-                this.updateExcludePathsList();
-                this.renderChangePagination();
-            });
-        }
-
-        const clearExcludeProcessFilterBtn = this.container.querySelector('#clearExcludeProcessFilterBtn');
-        if (clearExcludeProcessFilterBtn) {
-            clearExcludeProcessFilterBtn.addEventListener('click', () => {
-                this.selectedProcessesForExclude.clear();
-
-                this.currentExcludeProcessPage = 1;
-                this.currentExcludePathPage = 1;
-
-                this.updateExcludeProcessesList();
                 this.updateExcludePathsList();
                 this.renderChangePagination();
             });
@@ -968,10 +927,8 @@ export default class Module4 {
 	            this.selectedProcessesForInclude.add(code);
 	        }
 	    }
-	    // Как в форме подготовки/проведения: выбор процессов фильтрует список КП
-	    this.updateIncludeProcessesList();
-	    this.updateIncludePathsList();
-	    this.renderChangePagination();
+	    this.syncIncludePathsFromProcesses(); // <-- добавлено
+	    this.updateIncludeProcessesHighlight();
 	}
 
 	includePathClickHandler(e) {
@@ -989,6 +946,7 @@ export default class Module4 {
 	            this.selectedPathsForInclude.add(code);
 	        }
 	    }
+	    this.syncIncludeProcessesFromPaths(); // <-- добавлено
 	    this.updateIncludePathsHighlight();
 	}
 
@@ -1007,10 +965,8 @@ export default class Module4 {
 	            this.selectedProcessesForExclude.add(code);
 	        }
 	    }
-	    // Как в форме подготовки/проведения: выбор процессов фильтрует список КП
-	    this.updateExcludeProcessesList();
-	    this.updateExcludePathsList();
-	    this.renderChangePagination();
+	    this.syncExcludePathsFromProcesses(); // <-- добавлено
+	    this.updateExcludeProcessesHighlight();
 	}
 
 	excludePathClickHandler(e) {
@@ -1028,6 +984,7 @@ export default class Module4 {
 	            this.selectedPathsForExclude.add(code);
 	        }
 	    }
+	    this.syncExcludeProcessesFromPaths(); // <-- добавлено
 	    this.updateExcludePathsHighlight();
 	}
 
@@ -1392,8 +1349,8 @@ export default class Module4 {
     clearExcludeSelection() {
         this.selectedProcessesForExclude.clear();
         this.selectedPathsForExclude.clear();
-        this.updateExcludeProcessesList();
-        this.updateExcludePathsList();
+        this.updateExcludeProcessesHighlight();
+        this.updateExcludePathsHighlight();
         this.showNotification('Выделение для исключения очищено', 'info');
     }
 
@@ -1491,7 +1448,7 @@ export default class Module4 {
 
     renderChangePagination() {
         // Пагинация для включения процессов
-        let filteredIncludeProcesses = this.getFilteredProcessesForInclude();
+        let filteredIncludeProcesses = [...this.processes];
         if (this.includeProcessSearchTerm) {
             const term = this.includeProcessSearchTerm.toLowerCase();
             filteredIncludeProcesses = filteredIncludeProcesses.filter(p =>
@@ -1510,7 +1467,7 @@ export default class Module4 {
         }
 
         // Пагинация для включения КП
-        let filteredIncludePaths = this.getFilteredPathsForInclude();
+        let filteredIncludePaths = [...this.clientPaths];
         if (this.includePathSearchTerm) {
             const term = this.includePathSearchTerm.toLowerCase();
             filteredIncludePaths = filteredIncludePaths.filter(p =>
@@ -1529,7 +1486,7 @@ export default class Module4 {
         }
 
         // Пагинация для исключения процессов
-        let filteredExcludeProcesses = this.getFilteredProcessesForExclude();
+        let filteredExcludeProcesses = [...this.processes];
         if (this.excludeProcessSearchTerm) {
             const term = this.excludeProcessSearchTerm.toLowerCase();
             filteredExcludeProcesses = filteredExcludeProcesses.filter(p =>
@@ -1548,7 +1505,7 @@ export default class Module4 {
         }
 
         // Пагинация для исключения КП
-        let filteredExcludePaths = this.getFilteredPathsForExclude();
+        let filteredExcludePaths = [...this.clientPaths];
         if (this.excludePathSearchTerm) {
             const term = this.excludePathSearchTerm.toLowerCase();
             filteredExcludePaths = filteredExcludePaths.filter(p =>
@@ -1568,11 +1525,45 @@ export default class Module4 {
     }
 
     renderPaginationButtons(currentPage, totalPages, type) {
-        let html = '';
-        for (let i = 1; i <= totalPages; i++) {
-            html += `<button class="page-btn ${i === currentPage ? 'active' : ''}" data-page="${i}" data-type="${type}">${i}</button>`;
+        if (totalPages <= 1) return '';
+
+        const btn = (label, page, { disabled = false, active = false } = {}) =>
+            `<button class="page-btn ${active ? 'active' : ''}" data-page="${page}" data-type="${type}" ${disabled ? 'disabled' : ''} style="${disabled ? 'opacity:.4;cursor:default;' : ''}">${label}</button>`;
+
+        // Компактное окно номеров страниц вокруг текущей + первая/последняя
+        const delta = 2;
+        const pageSet = new Set([1, totalPages]);
+        for (let p = currentPage - delta; p <= currentPage + delta; p++) {
+            if (p >= 1 && p <= totalPages) pageSet.add(p);
         }
-        return html;
+        const sortedPages = [...pageSet].sort((a, b) => a - b);
+
+        let numbersHtml = '';
+        let prevPage = null;
+        sortedPages.forEach(p => {
+            if (prevPage !== null && p - prevPage > 1) {
+                numbersHtml += `<span style="padding:0 6px;color:#999;">…</span>`;
+            }
+            numbersHtml += btn(String(p), p, { active: p === currentPage });
+            prevPage = p;
+        });
+
+        const navHtml =
+            btn('« Первая', 1, { disabled: currentPage === 1 }) +
+            btn('‹ Назад', Math.max(1, currentPage - 1), { disabled: currentPage === 1 }) +
+            numbersHtml +
+            btn('Вперёд ›', Math.min(totalPages, currentPage + 1), { disabled: currentPage === totalPages }) +
+            btn('Последняя »', totalPages, { disabled: currentPage === totalPages });
+
+        return `
+            <div style="display:flex;flex-wrap:wrap;gap:4px;align-items:center;">${navHtml}</div>
+            <div style="display:flex;align-items:center;gap:6px;margin-top:6px;font-size:13px;color:#555;">
+                <span>Стр. ${currentPage} из ${totalPages}</span>
+                <input type="number" class="page-jump-input" data-type="${type}" data-total="${totalPages}"
+                       min="1" max="${totalPages}" placeholder="№ страницы" style="width:90px;">
+                <button class="btn btn-secondary page-jump-btn" data-type="${type}" data-total="${totalPages}">Перейти</button>
+            </div>
+        `;
     }
 
     attachPaginationEvents() {
@@ -1581,6 +1572,18 @@ export default class Module4 {
             btn.removeEventListener('click', this.paginationClickHandler);
             btn.addEventListener('click', this.paginationClickHandler.bind(this));
         });
+
+        const jumpBtns = this.container.querySelectorAll('.page-jump-btn');
+        jumpBtns.forEach(btn => {
+            btn.removeEventListener('click', this.paginationJumpHandler);
+            btn.addEventListener('click', this.paginationJumpHandler.bind(this));
+        });
+
+        const jumpInputs = this.container.querySelectorAll('.page-jump-input');
+        jumpInputs.forEach(input => {
+            input.removeEventListener('keydown', this.paginationJumpKeyHandler);
+            input.addEventListener('keydown', this.paginationJumpKeyHandler.bind(this));
+        });
     }
 
     attachChangePaginationEvents() {
@@ -1588,6 +1591,18 @@ export default class Module4 {
         btns.forEach(btn => {
             btn.removeEventListener('click', this.changePaginationClickHandler);
             btn.addEventListener('click', this.changePaginationClickHandler.bind(this));
+        });
+
+        const jumpBtns = this.container.querySelectorAll('.page-jump-btn');
+        jumpBtns.forEach(btn => {
+            btn.removeEventListener('click', this.changePaginationJumpHandler);
+            btn.addEventListener('click', this.changePaginationJumpHandler.bind(this));
+        });
+
+        const jumpInputs = this.container.querySelectorAll('.page-jump-input');
+        jumpInputs.forEach(input => {
+            input.removeEventListener('keydown', this.changePaginationJumpKeyHandler);
+            input.addEventListener('keydown', this.changePaginationJumpKeyHandler.bind(this));
         });
     }
 
@@ -1627,6 +1642,67 @@ export default class Module4 {
                 break;
         }
         this.renderChangePagination();
+    }
+
+    paginationJumpHandler(e) {
+        const btn = e.target;
+        this.jumpToPage(this.container.querySelector(`.page-jump-input[data-type="${btn.dataset.type}"]`), btn.dataset.type, parseInt(btn.dataset.total), 'main');
+    }
+
+    paginationJumpKeyHandler(e) {
+        if (e.key !== 'Enter') return;
+        const input = e.target;
+        this.jumpToPage(input, input.dataset.type, parseInt(input.dataset.total), 'main');
+    }
+
+    changePaginationJumpHandler(e) {
+        const btn = e.target;
+        this.jumpToPage(this.container.querySelector(`.page-jump-input[data-type="${btn.dataset.type}"]`), btn.dataset.type, parseInt(btn.dataset.total), 'change');
+    }
+
+    changePaginationJumpKeyHandler(e) {
+        if (e.key !== 'Enter') return;
+        const input = e.target;
+        this.jumpToPage(input, input.dataset.type, parseInt(input.dataset.total), 'change');
+    }
+
+    // Переход сразу на указанную страницу (используется полем "Перейти на страницу")
+    jumpToPage(input, type, totalPages, mode) {
+        if (!input) return;
+        let page = parseInt(input.value);
+        if (isNaN(page) || page < 1) page = 1;
+        if (totalPages && page > totalPages) page = totalPages;
+
+        if (mode === 'main') {
+            if (type === 'processes') {
+                this.currentIncludeProcessPage = page;
+                this.updateProcessesList();
+            } else if (type === 'paths') {
+                this.currentIncludePathPage = page;
+                this.updatePathsList();
+            }
+            this.renderPagination();
+        } else {
+            switch (type) {
+                case 'includeProcesses':
+                    this.currentIncludeProcessPage = page;
+                    this.updateIncludeProcessesList();
+                    break;
+                case 'includePaths':
+                    this.currentIncludePathPage = page;
+                    this.updateIncludePathsList();
+                    break;
+                case 'excludeProcesses':
+                    this.currentExcludeProcessPage = page;
+                    this.updateExcludeProcessesList();
+                    break;
+                case 'excludePaths':
+                    this.currentExcludePathPage = page;
+                    this.updateExcludePathsList();
+                    break;
+            }
+            this.renderChangePagination();
+        }
     }
 
     updateIncludeItemsTable() {

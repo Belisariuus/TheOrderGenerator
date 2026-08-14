@@ -1,3 +1,5 @@
+import { TEMPLATES_BASE64 } from './templates-data.js';
+
 export default class DocxGenerator {
     constructor(configManager) {
         this.configManager = configManager;
@@ -404,7 +406,7 @@ export default class DocxGenerator {
 
         // Сноска к слову "ресурса" в заголовке столбца "Наименование информационного ресурса"
         const FOOTNOTE_ID = 101;
-        const FOOTNOTE_TEXT = 'Сокращения по тексту используются согласно Технологической схеме процесса «Управление Каталогом ИТ-услуг» в ПАО Сбербанк от 20.10.2020 № 4381-3';
+        const FOOTNOTE_TEXT = 'Сокращения по тексту используются согласно Технологической схеме процесса «Управление Каталогом ИТ-услуг» в ПАО Сбербанк от 20.10.2020 № 4381-3'
         this.pendingFootnotes = [{ id: FOOTNOTE_ID, text: FOOTNOTE_TEXT }];
 
         const headerCells = [
@@ -572,7 +574,7 @@ export default class DocxGenerator {
 
         this.dictAttributesJson = dictAttributesJson;
         this.pathTaskFolder = pathTaskFolder;
-        
+
         // Инициализация основных атрибутов
         this.nameAudit = dictAttributesJson['name'];
         this.flagPrepOrExecute = dictAttributesJson['pod_or_prov'];
@@ -602,7 +604,7 @@ export default class DocxGenerator {
 
         if (!this.flagIsChange) {
             // Распоряжение на подготовку или проведение
-            this.nameTemplate = 'templates/TemplateOrderExecuteOrPrepAudit2026.docx';
+            this.nameTemplate = 'executePrep';
             [this.dateStart, this.dateEnd] = dictAttributesJson['dates'].split(',');
             this.pointAudit = dictAttributesJson['punkt'];
             this.dataHeadAudit = dictAttributesJson['supervisor'].split(',');
@@ -626,7 +628,7 @@ export default class DocxGenerator {
             this.listDataCuratorsAudit = dictAttributesJson['curator']
                 .split(';')
                 .map(cur => cur.split(','));
-            
+
             if (this.listDataCuratorsAudit[0][0] === '-') {
                 this.listDataCuratorsAudit = null;
             }
@@ -641,7 +643,7 @@ export default class DocxGenerator {
             }
         } else {
             // Распоряжение на изменение
-            this.nameTemplate = 'templates/TemplateOrderChangeAudit2026.docx';
+            this.nameTemplate = 'change';
             [this.dateOldEndAudit, this.dateNewEndAudit] = dictAttributesJson['dates'].split(',');
             this.numberOrderAudit = dictAttributesJson['provNum'];
             this.textReason = dictAttributesJson['reason'];
@@ -692,8 +694,8 @@ export default class DocxGenerator {
         }
 
         // Выбор форм слов
-        this.listWordForms = this.flagPrepOrExecute === '1' 
-            ? this.listWordFormsExecute 
+        this.listWordForms = this.flagPrepOrExecute === '1'
+            ? this.listWordFormsExecute
             : this.listWordFormsPrep;
 
         // Генерация документа в зависимости от типа
@@ -712,7 +714,7 @@ export default class DocxGenerator {
         const [empExecutionControlFio, empExecutionControlPost] = this.dataEmpExecutionControl.split(',');
         const empExecutionControlShortFio = this.shortFio(empExecutionControlFio, true);
         const empExecutionControlPostGent = this.titleToGent(empExecutionControlPost.replace('управления', ''));
-        
+
         let empExecutionControl;
         if (this.flagIsTB) {
             empExecutionControl = `${empExecutionControlPostGent} Управления внутреннего аудита по ${this.dictNameTB[this.nameTB][1]} ${empExecutionControlShortFio}`;
@@ -734,7 +736,7 @@ export default class DocxGenerator {
             const emp = this.listDataEmployeesAudit[i];
             const fio = this.removeBrackets(emp[0]);
             const tn = emp[0].substring(emp[0].indexOf('(') + 1, emp[0].lastIndexOf(')'));
-            
+
             listDictEmployees.push({
                 title: this.deabbrTitle(emp[2]),
                 dep: emp[1],
@@ -774,7 +776,7 @@ export default class DocxGenerator {
                 const processCode = 'П' + row[0];
                 const rowProcess = this.getProcessByCode(processCode);
                 if (!rowProcess) continue;
-                
+
                 const dictProcess = {
                     p_name: rowProcess.name,
                     p_code: rowProcess.code,
@@ -796,7 +798,7 @@ export default class DocxGenerator {
                         const kpCode = 'КП' + codeCP;
                         const rowClientPath = this.getClientPathByCode(kpCode);
                         if (!rowClientPath) continue;
-                        
+
                         const newDictProcess = { ...dictProcess };
                         newDictProcess.kp_i = String(i_CP++);
                         newDictProcess.kp_name = rowClientPath.name;
@@ -1010,7 +1012,7 @@ export default class DocxGenerator {
         const [empExecutionControlFio, empExecutionControlPost] = this.dataEmpExecutionControl.split(',');
         const empExecutionControlShortFio = this.shortFio(empExecutionControlFio, true);
         const empExecutionControlPostGent = this.titleToGent(empExecutionControlPost.replace('управления', ''));
-        
+
         let empExecutionControl;
         if (this.flagIsTB) {
             empExecutionControl = `${empExecutionControlPostGent} Управления внутреннего аудита по ${this.dictNameTB[this.nameTB][1]} ${empExecutionControlShortFio}`;
@@ -1020,7 +1022,7 @@ export default class DocxGenerator {
 
         // Список словарей для генерации таблицы сотрудников
         const listDictEmployees = [];
-        
+
         if (this.listDataEmployeesAdd) {
             this.listDataEmployeesAdd.sort((a, b) => {
                 const tbCompare = a[3].localeCompare(b[3]);
@@ -1034,7 +1036,7 @@ export default class DocxGenerator {
                 const emp = this.listDataEmployeesAdd[i];
                 const fio = this.removeBrackets(emp[0]);
                 const tn = emp[0].substring(emp[0].indexOf('(') + 1, emp[0].lastIndexOf(')'));
-                
+
                 listDictEmployees.push({
                     title: this.deabbrTitle(emp[2]),
                     dep: emp[1],
@@ -1060,7 +1062,7 @@ export default class DocxGenerator {
                 const emp = this.listDataEmployeesDel[i];
                 const fio = this.removeBrackets(emp[0]);
                 const tn = emp[0].substring(emp[0].indexOf('(') + 1, emp[0].lastIndexOf(')'));
-                
+
                 listDictEmployees.push({
                     title: this.deabbrTitle(emp[2]),
                     dep: emp[1],
@@ -1101,7 +1103,7 @@ export default class DocxGenerator {
                 const processCode = 'П' + row[0];
                 const rowProcess = this.getProcessByCode(processCode);
                 if (!rowProcess) continue;
-                
+
                 const dictProcess = {
                     p_name: rowProcess.name,
                     p_code: rowProcess.code,
@@ -1134,7 +1136,7 @@ export default class DocxGenerator {
                         const kpCode = 'КП' + codeCP;
                         const rowClientPath = this.getClientPathByCode(kpCode);
                         if (!rowClientPath) continue;
-                        
+
                         const newDictProcess = { ...dictProcess };
                         newDictProcess.kp_i = String(i_CP_Add++);
                         newDictProcess.kp_name = rowClientPath.name;
@@ -1215,7 +1217,7 @@ export default class DocxGenerator {
                 const processCode = 'П' + row[0];
                 const rowProcesses = this.getProcessByCode(processCode);
                 if (!rowProcesses) continue;
-                
+
                 const dictProcesses = {
                     p_name: rowProcesses.name,
                     p_code: rowProcesses.code,
@@ -1248,7 +1250,7 @@ export default class DocxGenerator {
                         const kpCode = 'КП' + codeCP;
                         const rowClientPath = this.getClientPathByCode(kpCode);
                         if (!rowClientPath) continue;
-                        
+
                         const newDictProcesses = { ...dictProcesses };
                         newDictProcesses.kp_i = String(i_CP_Rem++);
                         newDictProcesses.kp_name = rowClientPath.name;
@@ -1334,7 +1336,7 @@ export default class DocxGenerator {
         }
 
         // Причина
-        const stringReason = this.textReason 
+        const stringReason = this.textReason
             ? `В связи с необходимостью ${this.textReason} внести`
             : 'Внести';
 
@@ -1487,12 +1489,32 @@ export default class DocxGenerator {
     }
 
     /**
-     * Рендеринг шаблона и сохранение документа
+     * Декодирует Base64-строку в ArrayBuffer (без сетевых запросов, работает в браузере через atob)
      */
-    async renderTemplate(dictOrder, templatePath, taskName) {
+    base64ToArrayBuffer(base64) {
+        const cleanBase64 = String(base64 ?? '').replace(/\s/g, '');
+        const binaryString = atob(cleanBase64);
+        const len = binaryString.length;
+        const bytes = new Uint8Array(len);
+        for (let i = 0; i < len; i++) {
+            bytes[i] = binaryString.charCodeAt(i);
+        }
+        return bytes.buffer;
+    }
+
+    /**
+     * Рендеринг шаблона и сохранение документа.
+     * templateKey - ключ шаблона в TEMPLATES_BASE64 из templates-data.js ('executePrep' | 'change'),
+     * а не путь к файлу - бинарник шаблона больше не подгружается через fetch().
+     */
+    async renderTemplate(dictOrder, templateKey, taskName) {
         try {
-            const response = await fetch(templatePath);
-            const arrayBuffer = await response.arrayBuffer();
+            const base64 = TEMPLATES_BASE64[templateKey];
+            if (!base64) {
+                throw new Error(`Шаблон "${templateKey}" не найден в TEMPLATES_BASE64 (templates-data.js)`);
+            }
+
+            const arrayBuffer = this.base64ToArrayBuffer(base64);
 
             const zip = new PizZip(arrayBuffer);
 
@@ -1513,7 +1535,7 @@ export default class DocxGenerator {
 
             const blob = doc.toBlob();
             const fileName = `Распоряжение_${taskName}.docx`;
-            
+
             saveAs(blob, fileName);
             console.log(`Документ сохранен: ${fileName}`);
         } catch (error) {
@@ -1522,7 +1544,7 @@ export default class DocxGenerator {
                 const errors = error.properties.errors.map(e => e.message).join('\n');
                 alert(`Ошибка генерации документа:\n${errors}`);
             } else {
-                alert('Ошибка загрузки шаблона: ' + error.message);
+                alert('Ошибка декодирования шаблона (Base64): ' + error.message);
             }
         }
     }
