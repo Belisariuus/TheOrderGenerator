@@ -432,6 +432,14 @@ export default class Module5 {
         const employeesContainer = this.container.querySelector('#employeesContainer');
         const employeesList = this.container.querySelector('#employeesList');
 
+        // Для сценария "Изменение" выбор сотрудников не нужен - в документе для этого
+        // сценария всегда используется "Все сотрудники приложения 1" (без ФИО/Должности/Табельного номера)
+        if (this.currentScenario === 'change') {
+            if (employeesContainer) employeesContainer.style.display = 'none';
+            this.selectedEmployees.clear();
+            return;
+        }
+
         if (this.employees && this.employees.length > 0) {
             employeesList.innerHTML = this.employees.map(emp => `
                 <label class="checkbox-label">
@@ -459,29 +467,37 @@ export default class Module5 {
 
     updateEmployeeSelect() {
         const employeesList = this.container.querySelector('#employeesList');
-        if (employeesList) {
-            if (this.employees && this.employees.length > 0) {
-                employeesList.innerHTML = this.employees.map(emp => `
-                    <label class="checkbox-label">
-                        <input type="checkbox" value="${emp.id}" class="employee-checkbox" ${this.selectedEmployees.has(emp.id) ? 'checked' : ''}>
-                        <span><strong>${emp.fullName}</strong>${emp.position ? ` (${emp.position})` : ''}${emp.department ? ` - ${emp.department}` : ''}</span>
-                    </label>
-                `).join('');
+        if (!employeesList) return;
 
-                // Восстанавливаем выбранных сотрудников
-                const employeeCheckboxes = this.container.querySelectorAll('.employee-checkbox');
-                employeeCheckboxes.forEach(cb => {
-                    cb.addEventListener('change', () => {
-                        this.selectedEmployees.clear();
-                        const checked = this.container.querySelectorAll('.employee-checkbox:checked');
-                        checked.forEach(c => this.selectedEmployees.add(parseInt(c.value)));
-                    });
+        // Для сценария "Изменение" выбор сотрудников не нужен
+        if (this.currentScenario === 'change') {
+            const employeesContainer = this.container.querySelector('#employeesContainer');
+            if (employeesContainer) employeesContainer.style.display = 'none';
+            this.selectedEmployees.clear();
+            return;
+        }
+
+        if (this.employees && this.employees.length > 0) {
+            employeesList.innerHTML = this.employees.map(emp => `
+                <label class="checkbox-label">
+                    <input type="checkbox" value="${emp.id}" class="employee-checkbox" ${this.selectedEmployees.has(emp.id) ? 'checked' : ''}>
+                    <span><strong>${emp.fullName}</strong>${emp.position ? ` (${emp.position})` : ''}${emp.department ? ` - ${emp.department}` : ''}</span>
+                </label>
+            `).join('');
+
+            // Восстанавливаем выбранных сотрудников
+            const employeeCheckboxes = this.container.querySelectorAll('.employee-checkbox');
+            employeeCheckboxes.forEach(cb => {
+                cb.addEventListener('change', () => {
+                    this.selectedEmployees.clear();
+                    const checked = this.container.querySelectorAll('.employee-checkbox:checked');
+                    checked.forEach(c => this.selectedEmployees.add(parseInt(c.value)));
                 });
-            } else {
-                employeesList.innerHTML = '<div class="empty-message">⚠️ Нет сотрудников в команде проверки. Пожалуйста, сначала заполните модуль 3 "Команда проверки".</div>';
-                const employeesContainer = this.container.querySelector('#employeesContainer');
-                if (employeesContainer) employeesContainer.style.display = 'block';
-            }
+            });
+        } else {
+            employeesList.innerHTML = '<div class="empty-message">⚠️ Нет сотрудников в команде проверки. Пожалуйста, сначала заполните модуль 3 "Команда проверки".</div>';
+            const employeesContainer = this.container.querySelector('#employeesContainer');
+            if (employeesContainer) employeesContainer.style.display = 'block';
         }
     }
 

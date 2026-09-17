@@ -262,10 +262,39 @@ export default class DocxGenerator {
         // teamAudit.signer в сценарии "Изменение" тоже сохраняется плоско тем же ключом,
         // что и в сценарии "Новое" - поэтому уже покрывается общим блоком выше (teamAudit.signer).
 
+        // Карты "код -> {name, ownerDepartment}", построенные напрямую из данных, присланных
+        // Модулем 4 (а не из отдельного справочника data/processes.json). Это основной источник
+        // названий/подразделений процессов и КП - справочный файл используется только как fallback,
+        // если по какой-то причине карта не покрывает код (например, старый сохранённый конфиг).
+        this.processNameMap = new Map();
+        this.clientPathNameMap = new Map();
+        const collectNames = items => {
+            if (!items) return;
+            items.forEach(item => {
+                if (item.processCode && !this.processNameMap.has(item.processCode)) {
+                    this.processNameMap.set(item.processCode, {
+                        code: item.processCode,
+                        name: item.processName,
+                        ownerDepartment: item.processOwnerDepartment
+                    });
+                }
+                if (item.pathCode && !this.clientPathNameMap.has(item.pathCode)) {
+                    this.clientPathNameMap.set(item.pathCode, {
+                        code: item.pathCode,
+                        name: item.pathName,
+                        ownerDepartment: item.pathOwnerDepartment
+                    });
+                }
+            });
+        };
+        collectNames(processesModule.items);
+        collectNames(processesModule.include);
+        collectNames(processesModule.exclude);
+
         // Из ProcessesModule
         if (processesModule.items && processesModule.items.length > 0) {
             const procsKPs = processesModule.items.map(item => {
-                const procCode = item.processCode.replace('П', '');
+                const procCode = item.processCode ? item.processCode.replace('П', '') : '';
                 const kpCode = item.pathCode && item.pathCode !== '-' ? item.pathCode.replace('КП', '') : '';
                 return `${procCode}$${kpCode}`;
             }).join('%');
@@ -274,7 +303,7 @@ export default class DocxGenerator {
 
         if (processesModule.include && processesModule.include.length > 0) {
             const procsKPsAdd = processesModule.include.map(item => {
-                const procCode = item.processCode.replace('П', '');
+                const procCode = item.processCode ? item.processCode.replace('П', '') : '';
                 const kpCode = item.pathCode && item.pathCode !== '-' ? item.pathCode.replace('КП', '') : '';
                 return `${procCode}$${kpCode}`;
             }).join('%');
@@ -283,7 +312,7 @@ export default class DocxGenerator {
 
         if (processesModule.exclude && processesModule.exclude.length > 0) {
             const procsKPsRemove = processesModule.exclude.map(item => {
-                const procCode = item.processCode.replace('П', '');
+                const procCode = item.processCode ? item.processCode.replace('П', '') : '';
                 const kpCode = item.pathCode && item.pathCode !== '-' ? item.pathCode.replace('КП', '') : '';
                 return `${procCode}$${kpCode}`;
             }).join('%');
@@ -375,7 +404,7 @@ export default class DocxGenerator {
      * Принимает items из модуля AutomatedSystems в исходном виде, например:
      * { systemId, systemName, roles: string[], employees: [{fullName, position, tabNumber}] }
      *
-     * Правила формирования:
+     * Правила формирования (сценарий "Подготовка/Проведение", includeEmployeeColumns=true):
      * - Если выбрана только АС (нет ни ролей, ни сотрудников) - колонка "Необходимая роль/группа
      *   доступа" заполняется типовой фразой, а колонки ФИО/Должность/Табельный номер
      *   объединяются по горизонтали с текстом "Все участники (Приложение 1)".
@@ -383,14 +412,18 @@ export default class DocxGenerator {
      *   а колонки "№ п/п", "Наименование информационного ресурса", "Номер информационного
      *   ресурса (КЭ)" и "Необходимая роль/группа доступа" объединяются по вертикали на
      *   количество сотрудников; все роли перечисляются в одной ячейке, каждая с новой строки.
+     *
+     * Для сценария "Изменение" (includeEmployeeColumns=false) сотрудники в Модуле 5 не
+     * выбираются в принципе, поэтому колонки ФИО/Должность/Табельный номер из таблицы
+     * убираются полностью - остаются только № п/п, Наименование, Номер (КЭ) и Роль/группа доступа.
      */
-    buildAppendix3TableXml(items) {
+    buildAppendix3TableXml(items, { includeEmployeeColumns = true } = {}) {
         this.pendingFootnotes = null;
         if (!items || items.length === 0) return '';
 
         // Ширины колонок в тысячных долях процента (сумма = 5000, т.е. 100%)
         // Колонка табельного номера расширена, чтобы номер помещался на 1 строку
-        const COLW = {
+        const COLW = includeEmployeeColumns ? {
             num: 200,   // № п/п
             name: 950,  // Наименование информационного ресурса
             ke: 700,    // Номер информационного ресурса (КЭ)
@@ -398,6 +431,12 @@ export default class DocxGenerator {
             fio: 950,   // ФИО сотрудника
             post: 700,  // Должность
             tn: 550     // Табельный номер
+        } : {
+            // Без колонок сотрудников - освободившееся место распределено между оставшимися
+            num: 300,   // № п/п
+            name: 1900, // Наименование информационного ресурса
+            ke: 1200,   // Номер информационного ресурса (КЭ)
+            role: 1600  // Необходимая роль/группа доступа
         };
 
         const HEADER_FILL = 'EDEDED';
@@ -409,27 +448,31 @@ export default class DocxGenerator {
         const FOOTNOTE_TEXT = 'Сокращения по тексту используются согласно Технологической схеме процесса «Управление Каталогом ИТ-услуг» в ПАО Сбербанк от 20.10.2020 № 4381-3'
         this.pendingFootnotes = [{ id: FOOTNOTE_ID, text: FOOTNOTE_TEXT }];
 
-        const headerCells = [
+        const headerCellsArr = [
             this.buildTableCell('№ п/п', { width: COLW.num, bold: true, fill: HEADER_FILL }),
             this.buildHeaderCellWithFootnote('Наименование информационного ресурса', FOOTNOTE_ID, { width: COLW.name, fill: HEADER_FILL }),
             this.buildTableCell('Номер информационного ресурса (КЭ)', { width: COLW.ke, bold: true, fill: HEADER_FILL }),
             this.buildTableCell('Необходимая роль/группа доступа', { width: COLW.role, bold: true, fill: HEADER_FILL }),
-            this.buildTableCell('ФИО сотрудника', { width: COLW.fio, bold: true, fill: HEADER_FILL }),
-            this.buildTableCell('Должность', { width: COLW.post, bold: true, fill: HEADER_FILL }),
-            this.buildTableCell('Табельный номер', { width: COLW.tn, bold: true, fill: HEADER_FILL }),
-        ].join('');
-        const headerRow = `<w:tr><w:trPr><w:tblHeader/></w:trPr>${headerCells}</w:tr>`;
+        ];
+        if (includeEmployeeColumns) {
+            headerCellsArr.push(
+                this.buildTableCell('ФИО сотрудника', { width: COLW.fio, bold: true, fill: HEADER_FILL }),
+                this.buildTableCell('Должность', { width: COLW.post, bold: true, fill: HEADER_FILL }),
+                this.buildTableCell('Табельный номер', { width: COLW.tn, bold: true, fill: HEADER_FILL })
+            );
+        }
+        const headerRow = `<w:tr><w:trPr><w:tblHeader/></w:trPr>${headerCellsArr.join('')}</w:tr>`;
 
         const bodyRows = [];
         let rowNum = 1;
 
         for (const item of items) {
             const roles = Array.isArray(item.roles) ? item.roles.filter(Boolean) : [];
-            const employees = Array.isArray(item.employees) ? item.employees : [];
+            const employees = includeEmployeeColumns && Array.isArray(item.employees) ? item.employees : [];
 
             const roleText = roles.length > 0 ? roles.join('\n') : ROLE_PLACEHOLDER;
             // Кол-во строк в блоке ресурса: по одной строке на сотрудника,
-            // если сотрудники не указаны - одна строка "Все участники"
+            // если сотрудники не указаны (или колонки сотрудников отключены) - одна строка
             const rowsInBlock = employees.length > 0 ? employees.length : 1;
 
             for (let r = 0; r < rowsInBlock; r++) {
@@ -442,18 +485,20 @@ export default class DocxGenerator {
                 cells.push(this.buildTableCell(isFirstRow ? (item.systemId || '') : '', { width: COLW.ke, vMerge: vMergeMode }));
                 cells.push(this.buildTableCell(isFirstRow ? roleText : '', { width: COLW.role, vMerge: vMergeMode }));
 
-                if (employees.length === 0) {
-                    // Только АС выбрана - объединяем ФИО/Должность/Табельный номер по горизонтали
-                    cells.push(this.buildTableCell(ALL_PARTICIPANTS, {
-                        width: COLW.fio + COLW.post + COLW.tn,
-                        gridSpan: 3
-                    }));
-                } else {
-                    const emp = employees[r];
-                    cells.push(this.buildTableCell(emp?.fullName || '', { width: COLW.fio }));
-                    cells.push(this.buildTableCell(emp?.position || '', { width: COLW.post }));
-                    // noWrap, чтобы табельный номер всегда помещался на одну строку ячейки
-                    cells.push(this.buildTableCell(emp?.tabNumber || '', { width: COLW.tn, noWrap: true }));
+                if (includeEmployeeColumns) {
+                    if (employees.length === 0) {
+                        // Только АС выбрана - объединяем ФИО/Должность/Табельный номер по горизонтали
+                        cells.push(this.buildTableCell(ALL_PARTICIPANTS, {
+                            width: COLW.fio + COLW.post + COLW.tn,
+                            gridSpan: 3
+                        }));
+                    } else {
+                        const emp = employees[r];
+                        cells.push(this.buildTableCell(emp?.fullName || '', { width: COLW.fio }));
+                        cells.push(this.buildTableCell(emp?.position || '', { width: COLW.post }));
+                        // noWrap, чтобы табельный номер всегда помещался на одну строку ячейки
+                        cells.push(this.buildTableCell(emp?.tabNumber || '', { width: COLW.tn, noWrap: true }));
+                    }
                 }
 
                 bodyRows.push(`<w:tr>${cells.join('')}</w:tr>`);
@@ -461,6 +506,11 @@ export default class DocxGenerator {
 
             rowNum++;
         }
+
+        const gridCols = includeEmployeeColumns
+            ? [COLW.num, COLW.name, COLW.ke, COLW.role, COLW.fio, COLW.post, COLW.tn]
+            : [COLW.num, COLW.name, COLW.ke, COLW.role];
+        const tblGridXml = gridCols.map(w => `<w:gridCol w:w="${w}"/>`).join('');
 
         return `<w:tbl>` +
             `<w:tblPr>` +
@@ -477,15 +527,7 @@ export default class DocxGenerator {
                 `<w:tblLayout w:type="fixed"/>` +
                 `<w:tblLook w:val="04A0" w:firstRow="1" w:lastRow="0" w:firstColumn="1" w:lastColumn="0" w:noHBand="0" w:noVBand="1"/>` +
             `</w:tblPr>` +
-            `<w:tblGrid>` +
-                `<w:gridCol w:w="${COLW.num}"/>` +
-                `<w:gridCol w:w="${COLW.name}"/>` +
-                `<w:gridCol w:w="${COLW.ke}"/>` +
-                `<w:gridCol w:w="${COLW.role}"/>` +
-                `<w:gridCol w:w="${COLW.fio}"/>` +
-                `<w:gridCol w:w="${COLW.post}"/>` +
-                `<w:gridCol w:w="${COLW.tn}"/>` +
-            `</w:tblGrid>` +
+            `<w:tblGrid>${tblGridXml}</w:tblGrid>` +
             headerRow +
             bodyRows.join('') +
         `</w:tbl>`;
@@ -542,18 +584,29 @@ export default class DocxGenerator {
     }
 
     /**
-     * Получает процесс по коду из загруженных данных
+     * Получает процесс по коду. Сначала ищет в карте, построенной напрямую из данных,
+     * присланных Модулем 4 (актуальные название/подразделение на момент выбора пользователем),
+     * и только если там нет - подстраховывается справочником data/processes.json.
      */
     getProcessByCode(code) {
-        if (!this.processesData || !code) return null;
+        if (!code) return null;
+        if (this.processNameMap && this.processNameMap.has(code)) {
+            return this.processNameMap.get(code);
+        }
+        if (!this.processesData) return null;
         return this.processesData.processes.find(p => p.code === code || p.code === 'П' + code);
     }
 
     /**
-     * Получает клиентский путь по коду из загруженных данных
+     * Получает клиентский путь по коду. Сначала ищет в карте из Модуля 4,
+     * при отсутствии - в справочнике data/processes.json.
      */
     getClientPathByCode(code) {
-        if (!this.processesData || !code) return null;
+        if (!code) return null;
+        if (this.clientPathNameMap && this.clientPathNameMap.has(code)) {
+            return this.clientPathNameMap.get(code);
+        }
+        if (!this.processesData) return null;
         return this.processesData.clientPaths.find(kp => kp.code === code || kp.code === 'КП' + code);
     }
 
@@ -773,17 +826,30 @@ export default class DocxGenerator {
 
             let prevCP = 0;
             for (const row of listPairsProcessesClientPath) {
-                const processCode = 'П' + row[0];
-                const rowProcess = this.getProcessByCode(processCode);
-                if (!rowProcess) continue;
+                const hasProcessCode = !!row[0];
+                let dictProcess;
 
-                const dictProcess = {
-                    p_name: rowProcess.name,
-                    p_code: rowProcess.code,
-                    p_owner: rowProcess.ownerDepartment,
-                    p_i: String(i_P++)
-                };
-                uniqueProcess.add(dictProcess.p_code);
+                if (hasProcessCode) {
+                    const processCode = 'П' + row[0];
+                    const rowProcess = this.getProcessByCode(processCode);
+                    if (!rowProcess) continue;
+
+                    dictProcess = {
+                        p_name: rowProcess.name,
+                        p_code: rowProcess.code,
+                        p_owner: rowProcess.ownerDepartment,
+                        p_i: String(i_P++)
+                    };
+                    uniqueProcess.add(dictProcess.p_code);
+                } else {
+                    // Строка "только КП" - процесс не выбран (например, КП без привязанного процесса)
+                    dictProcess = {
+                        p_name: '-',
+                        p_code: '-',
+                        p_owner: '-',
+                        p_i: '-'
+                    };
+                }
 
                 // Если нет клиентских путей
                 if (row[1].length <= 1) {
@@ -864,7 +930,7 @@ export default class DocxGenerator {
                 const curatorFIO = this.shortFio(this.removeBrackets(curator[0]), false, false);
                 console.log(`Куратор ${curator}`);
                 const curatorPost = this.capitalizeFirstLetter(
-                    this.getFullTitle(curator[2].toLowerCase(), curator[1], true, true, false));
+                    this.getFullTitle(curator[2].toLowerCase(), curator[1], false, true, false));
                 curatorParts.push(`${curatorFIO} – ${curatorPost}`);
             }
             stringCurators = curatorParts.join(', ');
@@ -944,8 +1010,6 @@ export default class DocxGenerator {
             dir: empExecutionControl,
             podpis_title: signatoryPost,
             podpis_fio: signatoryFIO,
-            pril_procs: 2,
-            pril_aski: 3,
             ca_tb: ca_tb
         };
 
@@ -958,25 +1022,30 @@ export default class DocxGenerator {
             dictOrder.showSubsuper = false;
         }
 
-        // Передаем данные приложений только если они есть, иначе ставим флаги false
-        if (listDictEmployees && listDictEmployees.length > 0) {
+        // Сквозная нумерация приложений (в порядке emp -> procs -> aski): номер присваивается
+        // только реально показываемым приложениям, а если приложение всего одно - оно не нумеруется.
+        const hasApp1 = !!(listDictEmployees && listDictEmployees.length > 0);
+        const hasApp2 = !!this.listProcessesAudit;
+        const hasApp3 = !!appendix3TableXml;
+
+        const totalApps = [hasApp1, hasApp2, hasApp3].filter(Boolean).length;
+        const singleAppNoNumber = totalApps === 1;
+
+        let prilCounter = 0;
+
+        dictOrder.showApp1 = hasApp1;
+        dictOrder.showLinkApp1 = hasApp1;
+        if (hasApp1) {
+            dictOrder.pril_emp = singleAppNoNumber ? '' : ++prilCounter;
             dictOrder.employees = listDictEmployees;
-            dictOrder.showApp1 = true;
-            dictOrder.showLinkApp1 = true;
-        } else {
-            dictOrder.showApp1 = false;
-            dictOrder.showLinkApp1 = false;
         }
 
-        if (this.listProcessesAudit) {
+        dictOrder.showApp2 = hasApp2;
+        dictOrder.showLinkApp2 = hasApp2;
+        if (hasApp2) {
+            dictOrder.pril_procs = singleAppNoNumber ? '' : ++prilCounter;
             dictOrder.kps_and_ps_count = countProcessClientPath;
             dictOrder.processes = listDictProcesses;
-            dictOrder.showApp2 = true;
-            dictOrder.showLinkApp2 = true;
-        } else {
-            dictOrder.pril_aski = 2; // Сдвигаем номер приложения
-            dictOrder.showApp2 = false;
-            dictOrder.showLinkApp2 = false;
         }
 
         if (this.flagIsTB) {
@@ -989,15 +1058,13 @@ export default class DocxGenerator {
             dictOrder.podrazdelenie = 'центрального аппарата';
         }
 
-        if (appendix3TableXml) {
+        dictOrder.showApp3 = hasApp3;
+        dictOrder.showLinkApp3 = hasApp3;
+        if (hasApp3) {
+            dictOrder.pril_aski = singleAppNoNumber ? '' : ++prilCounter;
             // {@aski_table} - тег "сырого" XML (rawXml), встроенная возможность docxtemplater:
             // подставляет весь OOXML целиком, заменяя параграф с этим тегом в шаблоне
             dictOrder.aski_table = appendix3TableXml;
-            dictOrder.showApp3 = true;
-            dictOrder.showLinkApp3 = true;
-        } else {
-            dictOrder.showApp3 = false;
-            dictOrder.showLinkApp3 = false;
         }
 
         // Загрузка и рендеринг шаблона
@@ -1100,17 +1167,30 @@ export default class DocxGenerator {
             let prevCP = 0;
             let prevProcCode = 0;
             for (const row of listPairsProcessesClientPath) {
-                const processCode = 'П' + row[0];
-                const rowProcess = this.getProcessByCode(processCode);
-                if (!rowProcess) continue;
+                const hasProcessCode = !!row[0];
+                let dictProcess;
 
-                const dictProcess = {
-                    p_name: rowProcess.name,
-                    p_code: rowProcess.code,
-                    p_owner: rowProcess.ownerDepartment,
-                    p_i: String(i_P_Add++)
-                };
-                uniqueProcessAdd.add(dictProcess.p_code);
+                if (hasProcessCode) {
+                    const processCode = 'П' + row[0];
+                    const rowProcess = this.getProcessByCode(processCode);
+                    if (!rowProcess) continue;
+
+                    dictProcess = {
+                        p_name: rowProcess.name,
+                        p_code: rowProcess.code,
+                        p_owner: rowProcess.ownerDepartment,
+                        p_i: String(i_P_Add++)
+                    };
+                    uniqueProcessAdd.add(dictProcess.p_code);
+                } else {
+                    // Строка "только КП" - процесс не выбран
+                    dictProcess = {
+                        p_name: '-',
+                        p_code: '-',
+                        p_owner: '-',
+                        p_i: '-'
+                    };
+                }
 
                 if (row[1].length <= 1) {
                     dictProcess.kp_i = '-';
@@ -1214,17 +1294,30 @@ export default class DocxGenerator {
             let prevCP = 0;
             let prevProcCode = 0;
             for (const row of listProcessClientPathPairs) {
-                const processCode = 'П' + row[0];
-                const rowProcesses = this.getProcessByCode(processCode);
-                if (!rowProcesses) continue;
+                const hasProcessCode = !!row[0];
+                let dictProcesses;
 
-                const dictProcesses = {
-                    p_name: rowProcesses.name,
-                    p_code: rowProcesses.code,
-                    p_owner: rowProcesses.ownerDepartment,
-                    p_i: String(i_P_Rem++)
-                };
-                uniqueProcessRem.add(dictProcesses.p_code);
+                if (hasProcessCode) {
+                    const processCode = 'П' + row[0];
+                    const rowProcesses = this.getProcessByCode(processCode);
+                    if (!rowProcesses) continue;
+
+                    dictProcesses = {
+                        p_name: rowProcesses.name,
+                        p_code: rowProcesses.code,
+                        p_owner: rowProcesses.ownerDepartment,
+                        p_i: String(i_P_Rem++)
+                    };
+                    uniqueProcessRem.add(dictProcesses.p_code);
+                } else {
+                    // Строка "только КП" - процесс не выбран
+                    dictProcesses = {
+                        p_name: '-',
+                        p_code: '-',
+                        p_owner: '-',
+                        p_i: '-'
+                    };
+                }
 
                 if (row[1].length <= 1) {
                     dictProcesses.kp_i = '-';
@@ -1304,9 +1397,11 @@ export default class DocxGenerator {
         }
 
         // Приложение 3 (Приложение 4 в сценарии изменения): таблица генерируется как готовый
-        // XML-фрагмент (см. buildAppendix3TableXml), а не через построчное заполнение шаблона
+        // XML-фрагмент (см. buildAppendix3TableXml), а не через построчное заполнение шаблона.
+        // Для сценария "Изменение" сотрудники в Модуле 5 не выбираются, поэтому колонки
+        // ФИО/Должность/Табельный номер в таблице не нужны вовсе.
         const appendix3TableXml = this.automatedSystemsItems
-            ? this.buildAppendix3TableXml(this.automatedSystemsItems)
+            ? this.buildAppendix3TableXml(this.automatedSystemsItems, { includeEmployeeColumns: false })
             : '';
 
         // Форматирование дат
@@ -1386,12 +1481,16 @@ export default class DocxGenerator {
         const hasApp3 = !!(this.deleteListProcessesAudit && listDictProcessesRem && listDictProcessesRem.length > 0);
         const hasApp4 = !!appendix3TableXml;
 
+        // Если в документе всего одно приложение - оно не нумеруется (номер не выводится)
+        const totalApps = [hasApp1, hasApp2, hasApp3, hasApp4].filter(Boolean).length;
+        const singleAppNoNumber = totalApps === 1;
+
         let prilCounter = 0;
 
         dictOrder.showApp1 = hasApp1;
         dictOrder.showLinkApp1 = hasApp1;
         if (hasApp1) {
-            dictOrder.pril_emp = ++prilCounter;
+            dictOrder.pril_emp = singleAppNoNumber ? '' : ++prilCounter;
             dictOrder.employees = listDictEmployees;
             dictOrder.ca_tb = ca_tb;
         }
@@ -1399,7 +1498,7 @@ export default class DocxGenerator {
         dictOrder.showApp2 = hasApp2;
         dictOrder.showLinkApp2 = hasApp2;
         if (hasApp2) {
-            dictOrder.pril_add = ++prilCounter;
+            dictOrder.pril_add = singleAppNoNumber ? '' : ++prilCounter;
             dictOrder.kps_and_ps_count_add = countProcessClientPathAdd;
             dictOrder.processesAdded = listDictProcessesAdd;
         }
@@ -1407,7 +1506,7 @@ export default class DocxGenerator {
         dictOrder.showApp3 = hasApp3;
         dictOrder.showLinkApp3 = hasApp3;
         if (hasApp3) {
-            dictOrder.pril_rem = ++prilCounter;
+            dictOrder.pril_rem = singleAppNoNumber ? '' : ++prilCounter;
             dictOrder.kps_and_ps_count_rem = countRemoveProcessesClientPath;
             dictOrder.processesRemoved = listDictProcessesRem;
         }
@@ -1415,7 +1514,7 @@ export default class DocxGenerator {
         dictOrder.showApp4 = hasApp4;
         dictOrder.showLinkApp4 = hasApp4;
         if (hasApp4) {
-            dictOrder.pril_aski = ++prilCounter;
+            dictOrder.pril_aski = singleAppNoNumber ? '' : ++prilCounter;
             // {@aski_table} - тег "сырого" XML (rawXml), встроенная возможность docxtemplater
             dictOrder.aski_table = appendix3TableXml;
         }
